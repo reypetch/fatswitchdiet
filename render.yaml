@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: fatswitchdiet-v2
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DB_PATH
+        value: ./db/recipes.db
+    disk:
+      name: sqlite-data
+      mountPath: /opt/render/project/src/db
+      sizeGB: 1

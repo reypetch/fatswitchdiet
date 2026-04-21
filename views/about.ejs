@@ -1,0 +1,38 @@
+<%- include('partials/header', { title: 'About FatSwitchDiet' }) %>
+
+<section class="hero" style="padding:4rem 0;">
+  <div class="container">
+    <h1>About FatSwitchDiet</h1>
+    <p>The science of switching your body from fat-storing to fat-burning mode through strategic nutrition.</p>
+  </div>
+</section>
+
+<div class="container section">
+  <div style="max-width:800px; margin:0 auto;">
+    <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:2.5rem; margin-bottom:2rem;">
+      <h2 style="color:var(--green-dark); margin-bottom:1rem;">🔬 What is the Fat Switch?</h2>
+      <p style="line-height:1.8; color:var(--gray-800);">The Fat Switch Diet is based on the groundbreaking research showing that fructose metabolism activates an evolutionary survival switch in our bodies that promotes fat storage. By strategically choosing foods that keep this switch in the "off" position, you can optimize your body's natural fat-burning mechanisms without extreme restriction.</p>
+    </div>
+
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:1.5rem; margin-bottom:2rem;">
+      <% [
+        { icon: '🥗', title: 'Real Food First', desc: 'Every recipe uses whole, minimally processed ingredients that work with your metabolism.' },
+        { icon: '🤖', title: 'AI-Powered', desc: 'Claude AI generates personalized recipes and meal plans tailored to your goals and preferences.' },
+        { icon: '📊', title: 'Nutrition Focused', desc: 'Every recipe includes detailed macros and micronutrients to help you hit your targets.' },
+        { icon: '♻️', title: 'Sustainable', desc: 'Designed for long-term health, not short-term restriction. Enjoy food while losing fat.' },
+      ].forEach(item => { %>
+        <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.5rem; text-align:center;">
+          <div style="font-size:2.5rem; margin-bottom:0.75rem;"><%= item.icon %></div>
+          <h3 style="margin-bottom:0.4rem;"><%= item.title %></h3>
+          <p style="color:var(--gray-600); font-size:0.9rem;"><%= item.desc %></p>
+        </div>
+      <% }) %>
+    </div>
+
+    <div style="background:var(--green-dark); color:white; border-radius:var(--radius); padding:2rem; text-align:center;">
+      <p style="opacity:0.9; font-style:italic; font-size:1.05rem;">⚕️ <strong>Medical Disclaimer:</strong> FatSwitchDiet is for informational and educational purposes only. Always consult with a qualified healthcare professional before starting any new diet or exercise program.</p>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

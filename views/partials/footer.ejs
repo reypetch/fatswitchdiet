@@ -1,0 +1,42 @@
+  </main>
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">🥗 Fat<span>Switch</span>Diet</div>
+          <p class="footer-desc">Science-based recipes and meal plans to help you optimize fat-burning, boost metabolism, and achieve lasting health through smart food choices.</p>
+        </div>
+        <div>
+          <div class="footer-title">Recipes</div>
+          <ul class="footer-links">
+            <% if (typeof categories !== 'undefined') { %>
+              <% categories.slice(0, 4).forEach(cat => { %>
+                <li><a href="/category/<%= cat.slug %>"><%= cat.icon %> <%= cat.name %></a></li>
+              <% }) %>
+            <% } %>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-title">Tools</div>
+          <ul class="footer-links">
+            <li><a href="/generator">✨ AI Recipe Generator</a></li>
+            <li><a href="/diet-plan">📋 Diet Plan Generator</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="footer-title">Info</div>
+          <ul class="footer-links">
+            <li><a href="/about">About Us</a></li>
+            <li><a href="/contact">Contact</a></li>
+            <li><a href="/privacy">Privacy Policy</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; <%= new Date().getFullYear() %> FatSwitchDiet. Powered by Claude AI. For informational purposes only — consult a healthcare professional before starting any diet.</p>
+      </div>
+    </div>
+  </footer>
+  <%- typeof extraScripts !== 'undefined' ? extraScripts : '' %>
+</body>
+</html>

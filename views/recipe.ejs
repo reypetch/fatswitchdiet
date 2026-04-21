@@ -1,0 +1,111 @@
+<%- include('partials/header', { title: recipe.title }) %>
+
+<div class="container" style="padding-top:2.5rem; padding-bottom:3rem;">
+  <nav style="font-size:0.9rem; color:var(--gray-600); margin-bottom:2rem;">
+    <a href="/" style="color:var(--green);">Home</a> &rsaquo;
+    <% if (recipe.category_name) { %>
+      <a href="/category/<%= recipe.category_slug %>" style="color:var(--green);"><%= recipe.category_name %></a> &rsaquo;
+    <% } %>
+    <%= recipe.title %>
+  </nav>
+
+  <div class="recipe-layout">
+    <div>
+      <div class="recipe-hero-img">🍽️</div>
+
+      <div style="margin:1.5rem 0;">
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+          <% if (recipe.category_name) { %><span class="card-category"><%= recipe.category_name %></span><% } %>
+          <% if (recipe.ai_generated) { %><span class="ai-badge">🤖 AI Generated</span><% } %>
+        </div>
+        <h1 style="font-size:2.2rem; margin-bottom:0.75rem;"><%= recipe.title %></h1>
+        <p style="font-size:1.1rem; color:var(--gray-600); line-height:1.7;"><%= recipe.description %></p>
+      </div>
+
+      <div class="recipe-meta-bar">
+        <% if (recipe.prep_time) { %>
+          <div class="recipe-meta-item"><div class="value"><%= recipe.prep_time %>m</div><div class="label">Prep Time</div></div>
+        <% } %>
+        <% if (recipe.cook_time) { %>
+          <div class="recipe-meta-item"><div class="value"><%= recipe.cook_time %>m</div><div class="label">Cook Time</div></div>
+        <% } %>
+        <div class="recipe-meta-item"><div class="value"><%= recipe.servings || 4 %></div><div class="label">Servings</div></div>
+        <% if (recipe.calories) { %>
+          <div class="recipe-meta-item"><div class="value"><%= recipe.calories %></div><div class="label">Calories</div></div>
+        <% } %>
+        <% if (recipe.protein) { %>
+          <div class="recipe-meta-item"><div class="value"><%= recipe.protein %>g</div><div class="label">Protein</div></div>
+        <% } %>
+      </div>
+
+      <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:2rem; margin-bottom:1.5rem;">
+        <h2 style="margin-bottom:1rem; color:var(--green-dark);">🛒 Ingredients</h2>
+        <ul class="ingredients-list" style="list-style:none;">
+          <% recipe.ingredients.forEach(ing => { %>
+            <li style="display:flex; align-items:flex-start; gap:0.5rem; padding:0.6rem 0; border-bottom:1px solid var(--gray-100);">
+              <span style="color:var(--green); flex-shrink:0;">✓</span>
+              <%= ing %>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+
+      <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:2rem;">
+        <h2 style="margin-bottom:1rem; color:var(--green-dark);">👨‍🍳 Instructions</h2>
+        <ol class="instructions-list">
+          <% recipe.instructions.forEach(step => { %>
+            <li><%= step %></li>
+          <% }) %>
+        </ol>
+      </div>
+    </div>
+
+    <div>
+      <% if (recipe.calories || recipe.protein || recipe.carbs || recipe.fat) { %>
+      <div class="nutrition-card mb-3">
+        <h3 style="margin-bottom:1rem; font-size:1.1rem;">📊 Nutrition per Serving</h3>
+        <% if (recipe.calories) { %><div class="nutrition-row"><span>Calories</span><strong><%= recipe.calories %> kcal</strong></div><% } %>
+        <% if (recipe.protein) { %><div class="nutrition-row"><span>Protein</span><strong><%= recipe.protein %>g</strong></div><% } %>
+        <% if (recipe.carbs) { %><div class="nutrition-row"><span>Carbohydrates</span><strong><%= recipe.carbs %>g</strong></div><% } %>
+        <% if (recipe.fat) { %><div class="nutrition-row"><span>Fat</span><strong><%= recipe.fat %>g</strong></div><% } %>
+        <% if (recipe.fiber) { %><div class="nutrition-row"><span>Fiber</span><strong><%= recipe.fiber %>g</strong></div><% } %>
+      </div>
+      <% } %>
+
+      <% if (recipe.tags && recipe.tags.length > 0) { %>
+      <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.5rem; margin-bottom:1.5rem;">
+        <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">🏷️ Tags</h3>
+        <div class="tags">
+          <% recipe.tags.forEach(tag => { %><span class="tag">#<%= tag %></span><% }) %>
+        </div>
+      </div>
+      <% } %>
+
+      <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.5rem; text-align:center;">
+        <div style="font-size:2.5rem; margin-bottom:0.75rem;">✨</div>
+        <h3 style="margin-bottom:0.5rem;">Want more like this?</h3>
+        <p style="color:var(--gray-600); font-size:0.9rem; margin-bottom:1rem;">Generate a custom recipe with AI</p>
+        <a href="/generator" class="btn btn-primary" style="width:100%; justify-content:center;">AI Generator</a>
+      </div>
+    </div>
+  </div>
+
+  <% if (related.length > 0) { %>
+  <div style="margin-top:3rem;">
+    <h2 style="margin-bottom:1.5rem; color:var(--green-dark);">You Might Also Like</h2>
+    <div class="grid grid-3">
+      <% related.forEach(r => { %>
+        <div class="card">
+          <div class="card-img-placeholder" style="height:160px; font-size:3rem;">🥗</div>
+          <div class="card-body">
+            <h3 class="card-title"><a href="/recipe/<%= r.slug %>"><%= r.title %></a></h3>
+            <p class="card-desc"><%= r.description %></p>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

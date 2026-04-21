@@ -1,0 +1,50 @@
+<%- include('partials/header', { title: 'Contact Us' }) %>
+
+<section class="hero" style="padding:4rem 0;">
+  <div class="container">
+    <h1>📬 Contact Us</h1>
+    <p>Have a question, feedback, or recipe suggestion? We'd love to hear from you.</p>
+  </div>
+</section>
+
+<div class="container section">
+  <div style="max-width:600px; margin:0 auto;">
+    <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:2.5rem;">
+      <h2 style="margin-bottom:1.5rem; color:var(--green-dark);">Send a Message</h2>
+      <form id="contactForm">
+        <div class="form-group">
+          <label class="form-label">Your Name</label>
+          <input type="text" class="form-control" placeholder="Jane Smith" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" class="form-control" placeholder="jane@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subject</label>
+          <select class="form-control">
+            <option>General Question</option>
+            <option>Recipe Feedback</option>
+            <option>AI Generator Issue</option>
+            <option>Partnership Inquiry</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message</label>
+          <textarea class="form-control" rows="5" placeholder="Tell us what's on your mind..." required></textarea>
+        </div>
+        <button type="button" class="btn btn-primary btn-lg" style="width:100%; justify-content:center;" onclick="document.getElementById('thankYou').style.display='block'; this.closest('form').style.display='none';">
+          Send Message →
+        </button>
+      </form>
+      <div id="thankYou" style="display:none; text-align:center; padding:2rem 0;">
+        <div style="font-size:3rem; margin-bottom:1rem;">✅</div>
+        <h3 style="margin-bottom:0.5rem;">Message Sent!</h3>
+        <p style="color:var(--gray-600);">Thanks for reaching out. We'll get back to you within 24-48 hours.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

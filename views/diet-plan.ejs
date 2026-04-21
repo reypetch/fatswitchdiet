@@ -1,0 +1,163 @@
+<%- include('partials/header', { title: 'AI Diet Plan Generator' }) %>
+
+<section class="hero" style="padding:4rem 0;">
+  <div class="container">
+    <h1>📋 AI Diet Plan Generator</h1>
+    <p>Get a complete personalized meal plan tailored to your goals — powered by Claude AI and the Fat Switch method.</p>
+  </div>
+</section>
+
+<div class="container section">
+  <div class="generator-layout">
+    <div class="generator-form-card">
+      <h2 style="margin-bottom:1.5rem; color:var(--green-dark);">Create Your Plan</h2>
+      <form id="planForm">
+        <div class="form-group">
+          <label class="form-label" for="goal">Your Goal *</label>
+          <select class="form-control" id="goal" name="goal" required>
+            <option value="">Select your goal...</option>
+            <option value="Weight Loss">🔥 Weight Loss</option>
+            <option value="Muscle Gain">💪 Muscle Gain</option>
+            <option value="Maintenance">⚖️ Weight Maintenance</option>
+            <option value="Metabolic Reset">🔬 Metabolic Reset</option>
+            <option value="Energy Boost">⚡ Energy & Vitality</option>
+            <option value="Gut Health">🌿 Gut Health & Digestion</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="duration">Plan Duration</label>
+          <select class="form-control" id="duration" name="duration">
+            <option value="3">3 days</option>
+            <option value="7" selected>7 days</option>
+            <option value="14">14 days</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="calories">Daily Calorie Target (optional)</label>
+          <input type="number" class="form-control" id="calories" name="calories" placeholder="e.g. 1800 (leave blank for auto)" min="1200" max="4000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dietary Restrictions</label>
+          <div class="form-check">
+            <% ['Vegan', 'Vegetarian', 'Gluten-Free', 'Dairy-Free', 'Nut-Free', 'Low-Carb'].forEach(d => { %>
+              <label class="form-check-item">
+                <input type="checkbox" name="restrictions" value="<%= d %>">
+                <%= d %>
+              </label>
+            <% }) %>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-orange btn-lg" style="width:100%; justify-content:center;" id="planBtn">
+          📋 Generate My Plan
+        </button>
+      </form>
+    </div>
+
+    <div class="generator-result" id="planResult">
+      <div id="planPlaceholder" class="result-placeholder">
+        <div class="placeholder-icon">📋</div>
+        <h3>Your diet plan will appear here</h3>
+        <p>Select your goal and preferences to generate a personalized Fat Switch meal plan.</p>
+      </div>
+      <div id="planContent" style="display:none;"></div>
+      <div id="planError" style="display:none;"></div>
+    </div>
+  </div>
+
+  <% if (plans.length > 0) { %>
+  <div style="margin-top:4rem;">
+    <h2 style="margin-bottom:1.5rem; color:var(--green-dark);">📚 Recent AI-Generated Plans</h2>
+    <div class="grid grid-2">
+      <% plans.forEach(plan => { %>
+        <div class="card">
+          <div class="card-body">
+            <div class="card-category"><%= plan.goal %></div>
+            <h3 class="card-title"><%= plan.name %></h3>
+            <p class="card-desc"><%= plan.description %></p>
+            <div class="card-meta">
+              <span>📅 <%= plan.duration_days %> days</span>
+              <% if (plan.calories_per_day) { %><span>🔥 <%= plan.calories_per_day %> cal/day</span><% } %>
+              <span class="ai-badge">🤖 AI</span>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>
+
+<% extraScripts = `
+<script>
+const form = document.getElementById('planForm');
+const btn = document.getElementById('planBtn');
+const placeholder = document.getElementById('planPlaceholder');
+const planContent = document.getElementById('planContent');
+const planError = document.getElementById('planError');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const formData = new FormData(form);
+  const restrictions = [...document.querySelectorAll('input[name="restrictions"]:checked')].map(el => el.value);
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Creating Your Plan...';
+  placeholder.style.display = 'none';
+  planContent.style.display = 'none';
+  planError.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/generate-diet-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        goal: formData.get('goal'),
+        duration: formData.get('duration'),
+        calories: formData.get('calories'),
+        restrictions,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Generation failed');
+
+    const p = data.plan;
+    const daysHtml = p.meal_plan.map(day => \`
+      <div class="day-card">
+        <div class="day-header">Day \${day.day}</div>
+        <div class="day-meals">
+          \${['breakfast','lunch','dinner','snack'].map(m => day[m] ? \`
+            <div class="meal-item">
+              <div class="meal-type">\${m}</div>
+              <div class="meal-name">\${day[m].name}</div>
+              <div class="meal-cal">\${day[m].calories} cal · \${day[m].notes || ''}</div>
+            </div>
+          \` : '').join('')}
+        </div>
+      </div>
+    \`).join('');
+
+    planContent.innerHTML = \`
+      <div class="alert alert-success">✅ Your plan is ready!</div>
+      <h2 style="margin-bottom:0.5rem; color:var(--green-dark);">\${p.name}</h2>
+      <p style="color:var(--gray-600); margin-bottom:1rem;">\${p.description}</p>
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;">
+        <span>📅 \${p.duration_days} days</span>
+        \${p.calories_per_day ? \`<span>🔥 ~\${p.calories_per_day} cal/day</span>\` : ''}
+        <span>🎯 \${p.goal}</span>
+      </div>
+      \${daysHtml}
+    \`;
+    planContent.style.display = 'block';
+  } catch (err) {
+    planError.innerHTML = \`<div class="alert alert-error">❌ \${err.message}</div>\`;
+    planError.style.display = 'block';
+    placeholder.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '📋 Generate My Plan';
+  }
+});
+</script>
+`; %>

@@ -1,0 +1,227 @@
+require('dotenv').config();
+const express = require('express');
+const path = require('path');
+const rateLimit = require('express-rate-limit');
+const Anthropic = require('@anthropic-ai/sdk');
+const slugify = require('slugify');
+const db = require('./db/database');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many AI requests. Please try again later.' },
+});
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+function getCategories() {
+  return db.prepare('SELECT * FROM categories ORDER BY name').all();
+}
+
+function parseRecipe(recipe) {
+  if (!recipe) return null;
+  return {
+    ...recipe,
+    ingredients: JSON.parse(recipe.ingredients || '[]'),
+    instructions: JSON.parse(recipe.instructions || '[]'),
+    tags: JSON.parse(recipe.tags || '[]'),
+  };
+}
+
+// ─── Pages ─────────────────────────────────────────────────────────────────
+
+app.get('/', (req, res) => {
+  const featured = db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    WHERE r.featured = 1 ORDER BY r.created_at DESC LIMIT 6
+  `).all().map(parseRecipe);
+
+  const recent = db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    ORDER BY r.created_at DESC LIMIT 8
+  `).all().map(parseRecipe);
+
+  res.render('index', { featured, recent, categories: getCategories(), page: 'home' });
+});
+
+app.get('/recipe/:slug', (req, res) => {
+  const recipe = db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    WHERE r.slug = ?
+  `).get(req.params.slug);
+
+  if (!recipe) return res.status(404).render('404', { categories: getCategories(), page: '404' });
+
+  const related = db.prepare(`
+    SELECT r.*, c.name as category_name FROM recipes r
+    LEFT JOIN categories c ON r.category_id = c.id
+    WHERE r.category_id = ? AND r.id != ? LIMIT 3
+  `).all(recipe.category_id, recipe.id).map(parseRecipe);
+
+  res.render('recipe', { recipe: parseRecipe(recipe), related, categories: getCategories(), page: 'recipe' });
+});
+
+app.get('/category/:slug', (req, res) => {
+  const category = db.prepare('SELECT * FROM categories WHERE slug = ?').get(req.params.slug);
+  if (!category) return res.status(404).render('404', { categories: getCategories(), page: '404' });
+
+  const recipes = db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    WHERE r.category_id = ? ORDER BY r.created_at DESC
+  `).all(category.id).map(parseRecipe);
+
+  res.render('category', { category, recipes, categories: getCategories(), page: 'category' });
+});
+
+app.get('/generator', (req, res) => {
+  res.render('generator', { categories: getCategories(), page: 'generator' });
+});
+
+app.get('/diet-plan', (req, res) => {
+  const plans = db.prepare('SELECT * FROM diet_plans ORDER BY created_at DESC LIMIT 6').all();
+  res.render('diet-plan', { plans, categories: getCategories(), page: 'diet-plan' });
+});
+
+app.get('/about', (req, res) => res.render('about', { categories: getCategories(), page: 'about' }));
+app.get('/contact', (req, res) => res.render('contact', { categories: getCategories(), page: 'contact' }));
+app.get('/privacy', (req, res) => res.render('privacy', { categories: getCategories(), page: 'privacy' }));
+
+// ─── AI API Endpoints ───────────────────────────────────────────────────────
+
+app.post('/api/generate-recipe', aiLimiter, async (req, res) => {
+  try {
+    const { prompt, category, servings = 4, dietary = [] } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+
+    const dietaryStr = dietary.length ? `Dietary requirements: ${dietary.join(', ')}.` : '';
+    const systemPrompt = `You are a professional nutritionist and chef specializing in the Fat Switch Diet — a science-based approach to weight management through strategic food choices. Create healthy, delicious recipes that optimize metabolism and fat-burning.`;
+
+    const userPrompt = `Create a detailed ${category || 'healthy'} recipe for: "${prompt}"
+Servings: ${servings}. ${dietaryStr}
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "title": "Recipe Title",
+  "description": "2-3 sentence description",
+  "prep_time": 10,
+  "cook_time": 20,
+  "servings": ${servings},
+  "calories": 350,
+  "protein": 28,
+  "carbs": 30,
+  "fat": 12,
+  "fiber": 6,
+  "ingredients": ["ingredient 1 with amount", "ingredient 2 with amount"],
+  "instructions": ["Step 1 description", "Step 2 description"],
+  "tags": ["tag1", "tag2", "tag3"]
+}`;
+
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+
+    const content = message.content[0].text;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Invalid response format from AI');
+
+    const recipeData = JSON.parse(jsonMatch[0]);
+
+    // Save to DB
+    const slug = slugify(recipeData.title, { lower: true, strict: true }) + '-' + Date.now();
+    const catRow = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
+
+    db.prepare(`
+      INSERT INTO recipes (title, slug, description, ingredients, instructions, category_id, prep_time, cook_time, servings, calories, protein, carbs, fat, fiber, tags, ai_generated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).run([
+      recipeData.title, slug, recipeData.description,
+      JSON.stringify(recipeData.ingredients), JSON.stringify(recipeData.instructions),
+      catRow?.id || null, recipeData.prep_time, recipeData.cook_time, recipeData.servings,
+      recipeData.calories, recipeData.protein, recipeData.carbs, recipeData.fat, recipeData.fiber,
+      JSON.stringify(recipeData.tags || [])
+    ]);
+
+    res.json({ success: true, recipe: { ...recipeData, slug } });
+  } catch (err) {
+    console.error('Recipe generation error:', err);
+    res.status(500).json({ error: 'Failed to generate recipe. Please try again.' });
+  }
+});
+
+app.post('/api/generate-diet-plan', aiLimiter, async (req, res) => {
+  try {
+    const { goal, duration = 7, calories, restrictions = [] } = req.body;
+    if (!goal) return res.status(400).json({ error: 'Goal is required' });
+
+    const restrictStr = restrictions.length ? `Dietary restrictions: ${restrictions.join(', ')}.` : '';
+
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      system: 'You are a certified nutritionist specializing in the Fat Switch Diet method. Create personalized, science-backed meal plans.',
+      messages: [{
+        role: 'user',
+        content: `Create a ${duration}-day Fat Switch Diet meal plan for goal: "${goal}".
+Target calories: ${calories || 'auto-calculate for goal'}. ${restrictStr}
+
+Respond ONLY with valid JSON:
+{
+  "name": "Plan Name",
+  "description": "Plan overview 2-3 sentences",
+  "goal": "${goal}",
+  "duration_days": ${duration},
+  "calories_per_day": 1800,
+  "meal_plan": [
+    {
+      "day": 1,
+      "breakfast": {"name": "Meal name", "calories": 400, "notes": "brief note"},
+      "lunch": {"name": "Meal name", "calories": 500, "notes": "brief note"},
+      "dinner": {"name": "Meal name", "calories": 600, "notes": "brief note"},
+      "snack": {"name": "Snack name", "calories": 200, "notes": "brief note"}
+    }
+  ]
+}`
+      }],
+    });
+
+    const content = message.content[0].text;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Invalid response format');
+
+    const planData = JSON.parse(jsonMatch[0]);
+    const slug = slugify(planData.name, { lower: true, strict: true }) + '-' + Date.now();
+
+    db.prepare(`
+      INSERT INTO diet_plans (name, slug, description, duration_days, calories_per_day, goal, meal_plan, ai_generated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+    `).run([planData.name, slug, planData.description, planData.duration_days, planData.calories_per_day, planData.goal, JSON.stringify(planData.meal_plan)]);
+
+    res.json({ success: true, plan: planData });
+  } catch (err) {
+    console.error('Diet plan generation error:', err);
+    res.status(500).json({ error: 'Failed to generate diet plan. Please try again.' });
+  }
+});
+
+// ─── 404 ────────────────────────────────────────────────────────────────────
+
+app.use((req, res) => res.status(404).render('404', { categories: getCategories(), page: '404' }));
+
+app.listen(PORT, () => console.log(`FatSwitchDiet v2 running at http://localhost:${PORT}`));
