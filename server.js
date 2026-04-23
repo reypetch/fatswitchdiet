@@ -223,7 +223,7 @@ const SEED_RECIPES = [
   { prompt: 'almond butter apple slices',        category: 'Snacks',    servings: 1 },
 ];
 
-app.post('/admin/run-seed', async (req, res) => {
+app.get('/admin/run-seed', async (req, res) => {
   if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
 
   const skip = Math.max(0, parseInt(req.query.skip || '0', 10));
