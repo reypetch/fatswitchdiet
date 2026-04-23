@@ -5,6 +5,11 @@ const rateLimit = require('express-rate-limit');
 const Anthropic = require('@anthropic-ai/sdk');
 const slugify = require('slugify');
 const db = require('./db/database');
+const { getUnsplashImage } = require('./utils/images');
+
+// Ensure image_url column exists (safe migration)
+try { db.run('ALTER TABLE recipes ADD COLUMN image_url TEXT'); } catch (_) {}
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -170,19 +175,20 @@ Respond ONLY with valid JSON in this exact format:
     // Save to DB
     const slug = slugify(recipeData.title, { lower: true, strict: true }) + '-' + Date.now();
     const catRow = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
+    const imageUrl = await getUnsplashImage(recipeData.title);
 
     db.prepare(`
-      INSERT INTO recipes (title, slug, description, ingredients, instructions, category_id, prep_time, cook_time, servings, calories, protein, carbs, fat, fiber, tags, ai_generated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      INSERT INTO recipes (title, slug, description, ingredients, instructions, category_id, prep_time, cook_time, servings, calories, protein, carbs, fat, fiber, tags, image_url, ai_generated)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `).run([
       recipeData.title, slug, recipeData.description,
       JSON.stringify(recipeData.ingredients), JSON.stringify(recipeData.instructions),
       catRow?.id || null, recipeData.prep_time, recipeData.cook_time, recipeData.servings,
       recipeData.calories, recipeData.protein, recipeData.carbs, recipeData.fat, recipeData.fiber,
-      JSON.stringify(recipeData.tags || [])
+      JSON.stringify(recipeData.tags || []), imageUrl
     ]);
 
-    res.json({ success: true, recipe: { ...recipeData, slug } });
+    res.json({ success: true, recipe: { ...recipeData, slug, image_url: imageUrl } });
   } catch (err) {
     console.error('Recipe generation error:', err);
     res.status(500).json({ error: 'Failed to generate recipe. Please try again.' });

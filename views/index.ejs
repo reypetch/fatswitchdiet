@@ -39,7 +39,11 @@
     <div class="grid grid-3">
       <% featured.forEach(recipe => { %>
         <div class="card">
-          <div class="card-img-placeholder"><%= recipe.category_name === 'Smoothies' ? '🥤' : recipe.category_name === 'Breakfast' ? '🌅' : recipe.category_name === 'Desserts' ? '🍓' : '🥗' %></div>
+          <% if (recipe.image_url) { %>
+            <img src="<%= recipe.image_url %>" class="recipe-card-img" alt="<%= recipe.title %>" loading="lazy">
+          <% } else { %>
+            <div class="card-img-placeholder"><%= recipe.category_name === 'Smoothies' ? '🥤' : recipe.category_name === 'Breakfast' ? '🌅' : recipe.category_name === 'Desserts' ? '🍓' : '🥗' %></div>
+          <% } %>
           <div class="card-body">
             <% if (recipe.category_name) { %><span class="card-category"><%= recipe.category_name %></span><% } %>
             <h3 class="card-title"><a href="/recipe/<%= recipe.slug %>"><%= recipe.title %></a></h3>
@@ -90,7 +94,11 @@
     <div class="grid grid-4">
       <% recent.forEach(recipe => { %>
         <div class="card">
-          <div class="card-img-placeholder" style="height:160px; font-size:3rem;">🥗</div>
+          <% if (recipe.image_url) { %>
+            <img src="<%= recipe.image_url %>" class="recipe-card-img" alt="<%= recipe.title %>" loading="lazy">
+          <% } else { %>
+            <div class="card-img-placeholder" style="height:160px; font-size:3rem;">🥗</div>
+          <% } %>
           <div class="card-body">
             <% if (recipe.ai_generated) { %><span class="ai-badge mb-1">🤖 AI</span><% } %>
             <h3 class="card-title" style="font-size:1rem;"><a href="/recipe/<%= recipe.slug %>"><%= recipe.title %></a></h3>

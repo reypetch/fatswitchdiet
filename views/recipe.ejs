@@ -11,7 +11,18 @@
 
   <div class="recipe-layout">
     <div>
-      <div class="recipe-hero-img">🍽️</div>
+      <!-- Hero image -->
+      <% if (recipe.image_url) { %>
+        <img src="<%= recipe.image_url %>" class="recipe-hero-img" alt="<%= recipe.title %>" style="width:100%; object-fit:cover; border-radius:var(--radius);">
+      <% } else { %>
+        <div class="recipe-hero-img">🍽️</div>
+      <% } %>
+
+      <!-- AdSense: 728x90 leaderboard after hero image -->
+      <div class="ad-slot" style="margin:1.5rem 0; text-align:center; min-height:90px; background:#f8f9fa; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999; font-size:0.8rem; border-radius:4px;">
+        <!-- AdSense 728x90 Leaderboard -->
+        <span>Advertisement 728×90</span>
+      </div>
 
       <div style="margin:1.5rem 0;">
         <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
@@ -58,9 +69,21 @@
           <% }) %>
         </ol>
       </div>
+
+      <!-- AdSense: 300x250 rectangle between instructions and bottom -->
+      <div class="ad-slot" style="margin:1.5rem 0; text-align:center; min-height:250px; max-width:300px; background:#f8f9fa; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999; font-size:0.8rem; border-radius:4px;">
+        <!-- AdSense 300x250 Rectangle -->
+        <span>Advertisement 300×250</span>
+      </div>
     </div>
 
     <div>
+      <!-- AdSense: 300x600 half-page sidebar -->
+      <div class="ad-slot" style="margin-bottom:1.5rem; text-align:center; min-height:600px; background:#f8f9fa; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999; font-size:0.8rem; border-radius:4px;">
+        <!-- AdSense 300x600 Half Page -->
+        <span>Advertisement 300×600</span>
+      </div>
+
       <% if (recipe.calories || recipe.protein || recipe.carbs || recipe.fat) { %>
       <div class="nutrition-card mb-3">
         <h3 style="margin-bottom:1rem; font-size:1.1rem;">📊 Nutrition per Serving</h3>
@@ -96,7 +119,11 @@
     <div class="grid grid-3">
       <% related.forEach(r => { %>
         <div class="card">
-          <div class="card-img-placeholder" style="height:160px; font-size:3rem;">🥗</div>
+          <% if (r.image_url) { %>
+            <img src="<%= r.image_url %>" class="recipe-card-img" alt="<%= r.title %>" loading="lazy">
+          <% } else { %>
+            <div class="card-img-placeholder" style="height:160px; font-size:3rem;">🥗</div>
+          <% } %>
           <div class="card-body">
             <h3 class="card-title"><a href="/recipe/<%= r.slug %>"><%= r.title %></a></h3>
             <p class="card-desc"><%= r.description %></p>
@@ -106,6 +133,12 @@
     </div>
   </div>
   <% } %>
+
+  <!-- AdSense: 728x90 leaderboard bottom of page -->
+  <div class="ad-slot" style="margin-top:3rem; text-align:center; min-height:90px; background:#f8f9fa; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999; font-size:0.8rem; border-radius:4px;">
+    <!-- AdSense 728x90 Leaderboard Bottom -->
+    <span>Advertisement 728×90</span>
+  </div>
 </div>
 
 <%- include('partials/footer') %>

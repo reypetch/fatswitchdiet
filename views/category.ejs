@@ -20,7 +20,11 @@
     <div class="grid grid-3">
       <% recipes.forEach(recipe => { %>
         <div class="card">
-          <div class="card-img-placeholder"><%= category.icon %></div>
+          <% if (recipe.image_url) { %>
+            <img src="<%= recipe.image_url %>" class="recipe-card-img" alt="<%= recipe.title %>" loading="lazy">
+          <% } else { %>
+            <div class="card-img-placeholder"><%= category.icon %></div>
+          <% } %>
           <div class="card-body">
             <% if (recipe.ai_generated) { %><span class="ai-badge mb-1">🤖 AI</span><% } %>
             <h3 class="card-title"><a href="/recipe/<%= recipe.slug %>"><%= recipe.title %></a></h3>

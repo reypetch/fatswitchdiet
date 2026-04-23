@@ -12,6 +12,8 @@ services:
         value: 3000
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: UNSPLASH_ACCESS_KEY
+        sync: false
       - key: DB_PATH
         value: ./db/recipes.db
     disk:
