@@ -18,7 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const aiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 30,
   message: { error: 'Too many AI requests. Please try again later.' },
 });
 
@@ -99,6 +99,26 @@ app.get('/diet-plan', (req, res) => {
 app.get('/about', (req, res) => res.render('about', { categories: getCategories(), page: 'about' }));
 app.get('/contact', (req, res) => res.render('contact', { categories: getCategories(), page: 'contact' }));
 app.get('/privacy', (req, res) => res.render('privacy', { categories: getCategories(), page: 'privacy' }));
+
+app.get('/sitemap.xml', (req, res) => {
+  const base = `${req.protocol}://${req.get('host')}`;
+  const recipes = db.prepare('SELECT slug, created_at FROM recipes ORDER BY created_at DESC').all();
+
+  const urls = recipes.map((r) => {
+    const lastmod = r.created_at ? r.created_at.split(' ')[0].split('T')[0] : new Date().toISOString().split('T')[0];
+    return `  <url>
+    <loc>${base}/recipe/${r.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <priority>0.8</priority>
+  </url>`;
+  }).join('\n');
+
+  res.set('Content-Type', 'application/xml');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>`);
+});
 
 // ─── AI API Endpoints ───────────────────────────────────────────────────────
 
