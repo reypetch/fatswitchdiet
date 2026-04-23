@@ -144,15 +144,9 @@ ${urls}
 
 // ─── AI API Endpoints ───────────────────────────────────────────────────────
 
-app.post('/api/generate-recipe', aiLimiter, async (req, res) => {
-  try {
-    const { prompt, category, servings = 4, dietary = [] } = req.body;
-    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
-
-    const dietaryStr = dietary.length ? `Dietary requirements: ${dietary.join(', ')}.` : '';
-    const systemPrompt = `You are a professional nutritionist and chef specializing in the Fat Switch Diet — a science-based approach to weight management through strategic food choices. Create healthy, delicious recipes that optimize metabolism and fat-burning.`;
-
-    const userPrompt = `Create a detailed ${category || 'healthy'} recipe for: "${prompt}"
+async function generateAndSaveRecipe(prompt, category, servings = 4, dietary = []) {
+  const dietaryStr = dietary.length ? `Dietary requirements: ${dietary.join(', ')}.` : '';
+  const userPrompt = `Create a detailed ${category || 'healthy'} recipe for: "${prompt}"
 Servings: ${servings}. ${dietaryStr}
 
 Respond ONLY with valid JSON in this exact format:
@@ -172,36 +166,129 @@ Respond ONLY with valid JSON in this exact format:
   "tags": ["tag1", "tag2", "tag3"]
 }`;
 
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
+  const message = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    system: 'You are a professional nutritionist and chef specializing in the Fat Switch Diet — a science-based approach to weight management through strategic food choices. Create healthy, delicious recipes that optimize metabolism and fat-burning.',
+    messages: [{ role: 'user', content: userPrompt }],
+  });
 
-    const content = message.content[0].text;
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Invalid response format from AI');
+  const jsonMatch = message.content[0].text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('Invalid response format from AI');
+  const recipeData = JSON.parse(jsonMatch[0]);
 
-    const recipeData = JSON.parse(jsonMatch[0]);
+  const slug = slugify(recipeData.title, { lower: true, strict: true }) + '-' + Date.now();
+  const catRow = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
+  const imageUrl = await getUnsplashImage(recipeData.title);
 
-    // Save to DB
-    const slug = slugify(recipeData.title, { lower: true, strict: true }) + '-' + Date.now();
-    const catRow = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
-    const imageUrl = await getUnsplashImage(recipeData.title);
+  db.prepare(`
+    INSERT INTO recipes (title, slug, description, ingredients, instructions, category_id, prep_time, cook_time, servings, calories, protein, carbs, fat, fiber, tags, image_url, ai_generated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+  `).run([
+    recipeData.title, slug, recipeData.description,
+    JSON.stringify(recipeData.ingredients), JSON.stringify(recipeData.instructions),
+    catRow?.id || null, recipeData.prep_time, recipeData.cook_time, recipeData.servings,
+    recipeData.calories, recipeData.protein, recipeData.carbs, recipeData.fat, recipeData.fiber,
+    JSON.stringify(recipeData.tags || []), imageUrl,
+  ]);
 
-    db.prepare(`
-      INSERT INTO recipes (title, slug, description, ingredients, instructions, category_id, prep_time, cook_time, servings, calories, protein, carbs, fat, fiber, tags, image_url, ai_generated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-    `).run([
-      recipeData.title, slug, recipeData.description,
-      JSON.stringify(recipeData.ingredients), JSON.stringify(recipeData.instructions),
-      catRow?.id || null, recipeData.prep_time, recipeData.cook_time, recipeData.servings,
-      recipeData.calories, recipeData.protein, recipeData.carbs, recipeData.fat, recipeData.fiber,
-      JSON.stringify(recipeData.tags || []), imageUrl
-    ]);
+  return { ...recipeData, slug, image_url: imageUrl };
+}
 
-    res.json({ success: true, recipe: { ...recipeData, slug, image_url: imageUrl } });
+const SEED_RECIPES = [
+  { prompt: 'teriyaki salmon bowl',             category: 'Dinner',    servings: 2 },
+  { prompt: 'creamy chicken alfredo',            category: 'Dinner',    servings: 4 },
+  { prompt: 'korean beef bulgogi',               category: 'Dinner',    servings: 4 },
+  { prompt: 'thai green curry chicken',          category: 'Dinner',    servings: 4 },
+  { prompt: 'garlic butter shrimp pasta',        category: 'Dinner',    servings: 2 },
+  { prompt: 'mexican chicken burrito bowl',      category: 'Dinner',    servings: 4 },
+  { prompt: 'japanese gyudon beef rice',         category: 'Dinner',    servings: 2 },
+  { prompt: 'honey garlic pork tenderloin',      category: 'Dinner',    servings: 4 },
+  { prompt: 'fluffy japanese pancakes',          category: 'Breakfast', servings: 2 },
+  { prompt: 'avocado egg toast',                 category: 'Breakfast', servings: 1 },
+  { prompt: 'greek yogurt parfait',              category: 'Breakfast', servings: 1 },
+  { prompt: 'banana oat smoothie bowl',          category: 'Breakfast', servings: 1 },
+  { prompt: 'scrambled eggs with smoked salmon', category: 'Breakfast', servings: 2 },
+  { prompt: 'overnight oats',                    category: 'Breakfast', servings: 1 },
+  { prompt: 'vietnamese chicken pho',            category: 'Lunch',     servings: 2 },
+  { prompt: 'mediterranean quinoa salad',        category: 'Lunch',     servings: 2 },
+  { prompt: 'chicken caesar wrap',               category: 'Lunch',     servings: 1 },
+  { prompt: 'tom yum soup',                      category: 'Lunch',     servings: 2 },
+  { prompt: 'spicy tuna poke bowl',              category: 'Lunch',     servings: 1 },
+  { prompt: 'chocolate lava cake',               category: 'Desserts',  servings: 2 },
+  { prompt: 'mango sticky rice',                 category: 'Desserts',  servings: 2 },
+  { prompt: 'tiramisu lightened',                category: 'Desserts',  servings: 6 },
+  { prompt: 'protein energy balls',              category: 'Snacks',    servings: 12 },
+  { prompt: 'baked sweet potato chips',          category: 'Snacks',    servings: 2 },
+  { prompt: 'almond butter apple slices',        category: 'Snacks',    servings: 1 },
+];
+
+app.post('/admin/run-seed', async (req, res) => {
+  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
+
+  const skip = Math.max(0, parseInt(req.query.skip || '0', 10));
+  const batch = SEED_RECIPES.slice(skip);
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.flushHeaders();
+
+  const write = (line) => res.write(line + '\n');
+  write(`=== FatSwitchDiet Admin Seed ===`);
+  write(`Total recipes: ${SEED_RECIPES.length} | Skipping first: ${skip} | To generate: ${batch.length}`);
+  write('');
+
+  let ok = 0, fail = 0;
+  for (let i = 0; i < batch.length; i++) {
+    const { prompt, category, servings } = batch[i];
+    const label = `[${skip + i + 1}/${SEED_RECIPES.length}] ${prompt} (${category})`;
+    try {
+      const recipe = await generateAndSaveRecipe(prompt, category, servings);
+      write(`✓ ${label} → "${recipe.title}"`);
+      ok++;
+    } catch (err) {
+      write(`✗ ${label} → ${err.message}`);
+      fail++;
+    }
+    if (i < batch.length - 1) await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  write('');
+  write(`=== Seeding done: ${ok} succeeded, ${fail} failed ===`);
+
+  // Backfill images for any recipes still missing one
+  const missing = db.prepare("SELECT id, title FROM recipes WHERE image_url IS NULL OR image_url = '' ORDER BY id").all();
+  if (missing.length > 0) {
+    write('');
+    write(`=== Backfilling images for ${missing.length} recipes ===`);
+    let imgOk = 0, imgFail = 0;
+    for (let i = 0; i < missing.length; i++) {
+      const { id, title } = missing[i];
+      try {
+        const url = await getUnsplashImage(title);
+        db.prepare('UPDATE recipes SET image_url = ? WHERE id = ?').run([url, id]);
+        write(`  img ✓ ${title}`);
+        imgOk++;
+      } catch (err) {
+        write(`  img ✗ ${title} → ${err.message}`);
+        imgFail++;
+      }
+      if (i < missing.length - 1) await new Promise((r) => setTimeout(r, 500));
+    }
+    write(`=== Images done: ${imgOk} updated, ${imgFail} failed ===`);
+  } else {
+    write('All recipes already have images.');
+  }
+
+  res.end();
+});
+
+app.post('/api/generate-recipe', aiLimiter, async (req, res) => {
+  try {
+    const { prompt, category, servings = 4, dietary = [] } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+    const recipe = await generateAndSaveRecipe(prompt, category, servings, dietary);
+    res.json({ success: true, recipe });
   } catch (err) {
     console.error('Recipe generation error:', err);
     res.status(500).json({ error: 'Failed to generate recipe. Please try again.' });
