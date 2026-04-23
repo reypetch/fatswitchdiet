@@ -15,8 +15,8 @@ try { db.run('ALTER TABLE recipes ADD COLUMN image_url TEXT'); } catch (_) {}
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function main() {
-  const recipes = db.prepare('SELECT id, title FROM recipes WHERE image_url IS NULL ORDER BY id').all();
-  console.log(`Backfilling images for ${recipes.length} recipes...\n`);
+  const recipes = db.prepare('SELECT id, title FROM recipes ORDER BY id').all();
+  console.log(`Re-fetching images for ${recipes.length} recipes with cleaned queries...\n`);
 
   let ok = 0, fail = 0;
   for (let i = 0; i < recipes.length; i++) {
