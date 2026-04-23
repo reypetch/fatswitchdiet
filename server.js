@@ -23,7 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const aiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 10,
   message: { error: 'Too many AI requests. Please try again later.' },
 });
 
