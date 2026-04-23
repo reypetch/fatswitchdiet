@@ -109,6 +109,19 @@ app.get('/google3e9b317ccdb7eb55.html', (req, res) => {
   res.type('text/html').send('google-site-verification: google3e9b317ccdb7eb55.html');
 });
 
+app.get('/admin/db-status', (req, res) => {
+  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
+  const total = db.prepare('SELECT COUNT(*) as n FROM recipes').get().n;
+  const withImages = db.prepare("SELECT COUNT(*) as n FROM recipes WHERE image_url IS NOT NULL AND image_url != ''").get().n;
+  const sample = db.prepare("SELECT title, image_url FROM recipes ORDER BY id LIMIT 3").all();
+  res.json({
+    total_recipes: total,
+    with_images: withImages,
+    without_images: total - withImages,
+    sample,
+  });
+});
+
 app.get('/sitemap.xml', (req, res) => {
   const base = `${req.protocol}://${req.get('host')}`;
   const recipes = db.prepare('SELECT slug, created_at FROM recipes ORDER BY created_at DESC').all();
