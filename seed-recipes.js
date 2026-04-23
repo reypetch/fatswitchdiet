@@ -61,6 +61,9 @@ function post(body) {
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function main() {
+  const skipArg = process.argv.find((a) => a.startsWith('--skip='));
+  const skip = skipArg ? parseInt(skipArg.split('=')[1], 10) : 0;
+
   // Verify server is up
   try {
     await post({ prompt: 'test' });
@@ -71,12 +74,14 @@ async function main() {
     }
   }
 
-  console.log(`Seeding ${recipes.length} recipes via HTTP API (port ${PORT})...\n`);
+  const batch = recipes.slice(skip);
+  console.log(`Seeding ${batch.length} recipes (skipping first ${skip}) via HTTP API (port ${PORT})...\n`);
   let ok = 0, fail = 0;
 
-  for (let i = 0; i < recipes.length; i++) {
-    const { prompt, category, servings } = recipes[i];
-    process.stdout.write(`[${i + 1}/${recipes.length}] ${prompt} (${category})... `);
+  for (let i = 0; i < batch.length; i++) {
+    const globalIndex = skip + i;
+    const { prompt, category, servings } = batch[i];
+    process.stdout.write(`[${globalIndex + 1}/${recipes.length}] ${prompt} (${category})... `);
     try {
       const res = await post({ prompt, category, servings });
       if (res.status === 200 && res.body.success) {
@@ -91,10 +96,13 @@ async function main() {
       fail++;
     }
 
-    if (i < recipes.length - 1) await sleep(3000);
+    if (i < batch.length - 1) await sleep(3000);
   }
 
   console.log(`\nDone. ${ok} succeeded, ${fail} failed.`);
+  if (skip + ok < recipes.length) {
+    console.log(`Resume with: node seed-recipes.js --skip=${skip + ok}`);
+  }
 }
 
 main();
