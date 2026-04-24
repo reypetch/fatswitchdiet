@@ -314,6 +314,28 @@ const SEED_RECIPES = [
   { prompt: 'protein energy balls',              category: 'Snacks',    servings: 12 },
   { prompt: 'baked sweet potato chips',          category: 'Snacks',    servings: 2 },
   { prompt: 'almond butter apple slices',        category: 'Snacks',    servings: 1 },
+  // Batch 2 – Western (8)
+  { prompt: 'spaghetti carbonara',               category: 'Dinner',    servings: 4 },
+  { prompt: 'beef tacos',                        category: 'Dinner',    servings: 4 },
+  { prompt: 'greek salad',                       category: 'Lunch',     servings: 2 },
+  { prompt: 'french onion soup',                 category: 'Lunch',     servings: 4 },
+  { prompt: 'eggs benedict',                     category: 'Breakfast', servings: 2 },
+  { prompt: 'mushroom risotto',                  category: 'Dinner',    servings: 4 },
+  { prompt: 'banana foster pancakes',            category: 'Breakfast', servings: 2 },
+  { prompt: 'acai bowl',                         category: 'Breakfast', servings: 1 },
+  // Batch 2 – Asian / Middle East (12)
+  { prompt: 'butter chicken curry',              category: 'Dinner',    servings: 4 },
+  { prompt: 'pad see ew noodles',                category: 'Dinner',    servings: 2 },
+  { prompt: 'beef bibimbap',                     category: 'Dinner',    servings: 2 },
+  { prompt: 'chicken shawarma wrap',             category: 'Lunch',     servings: 2 },
+  { prompt: 'laksa soup',                        category: 'Lunch',     servings: 2 },
+  { prompt: 'beef rendang',                      category: 'Dinner',    servings: 4 },
+  { prompt: 'chicken tikka masala',              category: 'Dinner',    servings: 4 },
+  { prompt: 'vietnamese spring rolls',           category: 'Snacks',    servings: 4 },
+  { prompt: 'korean fried rice',                 category: 'Dinner',    servings: 2 },
+  { prompt: 'turkish eggs cilbir',               category: 'Breakfast', servings: 2 },
+  { prompt: 'japanese miso ramen',               category: 'Dinner',    servings: 2 },
+  { prompt: 'moroccan lamb tagine',              category: 'Dinner',    servings: 4 },
 ];
 
 app.get('/admin/run-seed', async (req, res) => {
