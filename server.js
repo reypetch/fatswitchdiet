@@ -393,8 +393,8 @@ Respond ONLY with valid JSON:
 
 app.use((req, res) => res.status(404).render('404', { categories: getCategories(), page: '404' }));
 
-app.listen(PORT, () => {
-  console.log(`FatSwitchDiet v2 running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`FatSwitchDiet v2 listening on 0.0.0.0:${PORT}`);
   console.log(`[startup] NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
   const dbBase = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DB_PATH || './data';
   const dbResolved = dbBase.endsWith('.db') ? dbBase : `${dbBase}/recipes.db`;

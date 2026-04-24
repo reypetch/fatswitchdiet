@@ -2,7 +2,6 @@
   "build": { "builder": "NIXPACKS" },
   "deploy": {
     "startCommand": "node server.js",
-    "healthcheckPath": "/healthz",
     "restartPolicyType": "ON_FAILURE"
   }
 }
