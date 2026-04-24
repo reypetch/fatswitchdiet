@@ -290,6 +290,36 @@ app.get('/admin/run-seed', async (req, res) => {
   res.end();
 });
 
+app.get('/admin/refresh-images', async (req, res) => {
+  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.flushHeaders();
+
+  const write = (line) => res.write(line + '\n');
+  const recipes = db.prepare('SELECT id, title FROM recipes ORDER BY id').all();
+  write(`=== Refreshing images for ALL ${recipes.length} recipes ===\n`);
+
+  let ok = 0, fail = 0;
+  for (let i = 0; i < recipes.length; i++) {
+    const { id, title } = recipes[i];
+    try {
+      const url = await getUnsplashImage(title);
+      db.prepare('UPDATE recipes SET image_url = ? WHERE id = ?').run([url, id]);
+      write(`✓ [${i + 1}/${recipes.length}] ${title}`);
+      ok++;
+    } catch (err) {
+      write(`✗ [${i + 1}/${recipes.length}] ${title} → ${err.message}`);
+      fail++;
+    }
+    if (i < recipes.length - 1) await new Promise((r) => setTimeout(r, 500));
+  }
+
+  write(`\n=== Done: ${ok} updated, ${fail} failed ===`);
+  res.end();
+});
+
 app.post('/api/generate-recipe', aiLimiter, async (req, res) => {
   try {
     const { prompt, category, servings = 4, dietary = [] } = req.body;
