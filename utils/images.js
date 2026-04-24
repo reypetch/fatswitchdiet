@@ -2,17 +2,45 @@ const https = require('https');
 
 const FALLBACK = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80';
 
+// Individual words only — hyphens are split before this set is checked
 const NOISE_WORDS = new Set([
-  'fat-burning', 'fat', 'burning', 'metabolism', 'metabolic', 'protein',
-  'lightened', 'light', 'healthy', 'guilt-free', 'switch', 'diet',
-  'low-carb', 'high-protein', 'crispy', 'boosting', 'boosted',
-  'packed', 'powered', 'loaded', 'style', 'inspired', 'homemade',
-  'easy', 'quick', 'simple', 'classic', 'hearty', 'delicious',
-  'fresh', 'zesty', 'creamy', 'fluffy', 'smoked', 'roasted',
-  'grilled', 'baked', 'pan', 'seared',
+  // diet / marketing
+  'fat', 'burning', 'metabolism', 'metabolic', 'switch', 'diet',
+  'guilt', 'free', 'healthy', 'light', 'lightened', 'boost', 'boosting', 'boosted',
+  'low', 'carb', 'high', 'protein', 'packed', 'powered', 'loaded',
+  // cooking style
+  'crispy', 'creamy', 'fluffy', 'smoked', 'roasted', 'grilled', 'baked', 'pan', 'seared',
+  // filler adjectives
+  'easy', 'quick', 'simple', 'classic', 'hearty', 'delicious', 'fresh',
+  'zesty', 'homemade', 'inspired', 'style', 'truffle',
+  // stop words
+  'with', 'the', 'and', 'or', 'in', 'of', 'for', 'on', 'my',
 ]);
 
+// Exact dish overrides — checked before noise filtering for reliable image results
+const DISH_OVERRIDES = [
+  [/nasi\s+goreng/i,    'nasi goreng indonesian'],
+  [/mandi\s+rice/i,     'mandi rice arabic'],
+  [/smash\s+burger/i,   'smash burger'],
+  [/pad\s+thai/i,       'pad thai noodles'],
+  [/tom\s+yum/i,        'tom yum soup'],
+  [/poke\s+bowl/i,      'poke bowl'],
+  [/banh\s+mi/i,        'banh mi sandwich'],
+  [/bibim\s*bap/i,      'bibimbap korean'],
+  [/pho\b/i,            'pho vietnamese noodles'],
+  [/rendang/i,          'beef rendang indonesian'],
+  [/bulgogi/i,          'bulgogi korean beef'],
+  [/gyudon/i,           'gyudon japanese beef rice'],
+  [/teriyaki/i,         'teriyaki japanese'],
+  [/laksa/i,            'laksa noodle soup'],
+  [/char\s+kway\s+teow/i, 'char kway teow noodles'],
+];
+
 function cleanQuery(title) {
+  for (const [pattern, query] of DISH_OVERRIDES) {
+    if (pattern.test(title)) return query;
+  }
+
   const words = title
     .toLowerCase()
     .replace(/-/g, ' ')
@@ -46,4 +74,4 @@ function getUnsplashImage(query) {
   });
 }
 
-module.exports = { getUnsplashImage };
+module.exports = { getUnsplashImage, cleanQuery };
