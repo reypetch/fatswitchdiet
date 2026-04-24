@@ -2,7 +2,8 @@ const { Database } = require('node-sqlite3-wasm');
 const path = require('path');
 const fs = require('fs');
 
-const dbPath = process.env.DB_PATH || './db/recipes.db';
+const dbBase = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DB_PATH || './data';
+const dbPath = dbBase.endsWith('.db') ? dbBase : path.join(dbBase, 'recipes.db');
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
