@@ -13,7 +13,14 @@ try { db.run('ALTER TABLE recipes ADD COLUMN image_url TEXT'); } catch (_) {}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Let the SDK read ANTHROPIC_API_KEY from env directly (avoids passing undefined)
+const anthropic = new Anthropic();
+
+const apiKeyPreview = process.env.ANTHROPIC_API_KEY
+  ? process.env.ANTHROPIC_API_KEY.slice(0, 10) + '...'
+  : 'NOT SET';
+console.log(`[startup] ANTHROPIC_API_KEY: ${apiKeyPreview}`);
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -354,4 +361,10 @@ Respond ONLY with valid JSON:
 
 app.use((req, res) => res.status(404).render('404', { categories: getCategories(), page: '404' }));
 
-app.listen(PORT, () => console.log(`FatSwitchDiet v2 running at http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`FatSwitchDiet v2 running at http://localhost:${PORT}`);
+  console.log(`[startup] NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+  const dbBase = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DB_PATH || './data';
+  const dbResolved = dbBase.endsWith('.db') ? dbBase : `${dbBase}/recipes.db`;
+  console.log(`[startup] DB resolved to: ${dbResolved}`);
+});
