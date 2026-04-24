@@ -140,18 +140,41 @@ app.get('/admin/recipes', (req, res) => {
   `).all();
 
   const key = req.query.key;
+  const esc = (s) => (s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
   const rows = recipes.map((r) => `
-    <tr>
-      <td>${r.id}</td>
-      <td><a href="/recipe/${r.slug}" target="_blank">${r.title}</a></td>
-      <td>${r.category || '—'}</td>
-      <td>${r.image_url ? '✓' : '✗'}</td>
-      <td>${(r.created_at || '').slice(0, 16)}</td>
+    <tr id="row-${r.id}">
+      <td style="font-size:0.8rem;color:#666">${r.id}</td>
       <td>
-        <form method="POST" action="/admin/recipes/${r.id}/delete?key=${key}" onsubmit="return confirm('Delete ${r.title.replace(/'/g, "\\'")}?')">
+        ${r.image_url
+          ? `<img src="${esc(r.image_url)}" id="thumb-${r.id}" style="width:50px;height:50px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;">`
+          : `<span id="thumb-${r.id}" style="display:inline-block;width:50px;height:50px;background:#eee;border-radius:4px;vertical-align:middle;margin-right:6px;line-height:50px;text-align:center;">✗</span>`}
+        <a href="/recipe/${esc(r.slug)}" target="_blank">${esc(r.title)}</a>
+      </td>
+      <td>${esc(r.category || '—')}</td>
+      <td>${(r.created_at || '').slice(0, 16)}</td>
+      <td style="white-space:nowrap">
+        <button onclick="toggleReplace(${r.id})" style="background:#2d6a4f;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-right:4px;">📷 Replace</button>
+        <form method="POST" action="/admin/recipes/${r.id}/delete?key=${key}" style="display:inline" onsubmit="return confirm('Delete ${esc(r.title)}?')">
           <button type="submit" style="background:#e53e3e;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">Delete</button>
         </form>
       </td>
+    </tr>
+    <tr id="replace-row-${r.id}" style="display:none;background:#f0fdf4;">
+      <td></td>
+      <td colspan="3" style="padding:12px 14px;">
+        <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
+          <input id="url-${r.id}" type="text" placeholder="Paste image URL..." style="flex:1;min-width:260px;padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9rem;">
+          <button onclick="previewImage(${r.id})" style="background:#555;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">Preview</button>
+          <button onclick="saveImage(${r.id},'${key}')" style="background:#2d6a4f;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">Save</button>
+          <button onclick="toggleReplace(${r.id})" style="background:#999;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;">Cancel</button>
+        </div>
+        <div id="preview-${r.id}" style="margin-top:10px;display:none;">
+          <img id="preview-img-${r.id}" src="" style="max-height:120px;max-width:320px;border-radius:6px;border:2px solid #2d6a4f;">
+          <span id="preview-err-${r.id}" style="color:#e53e3e;font-size:0.85rem;display:none;">Failed to load image.</span>
+        </div>
+      </td>
+      <td></td>
     </tr>`).join('');
 
   res.send(`<!DOCTYPE html>
@@ -159,12 +182,11 @@ app.get('/admin/recipes', (req, res) => {
 <style>
   body{font-family:sans-serif;padding:2rem;background:#f7f7f7}
   h1{margin-bottom:1rem}
-  .actions{margin-bottom:1rem;display:flex;gap:1rem;align-items:center}
+  .actions{margin-bottom:1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
   table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1)}
-  th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #eee;font-size:0.9rem}
+  th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #eee;font-size:0.9rem;vertical-align:middle}
   th{background:#2d6a4f;color:#fff}
   tr:last-child td{border-bottom:none}
-  tr:hover td{background:#f0fdf4}
   a{color:#2d6a4f}
 </style></head>
 <body>
@@ -172,13 +194,57 @@ app.get('/admin/recipes', (req, res) => {
 <div class="actions">
   <a href="/admin/db-status?key=${key}">DB Status</a>
   <a href="/admin/dedupe?key=${key}" onclick="return confirm('Remove all duplicates?')">Run Dedupe</a>
-  <a href="/admin/refresh-images?key=${key}" target="_blank">Refresh Images</a>
+  <a href="/admin/refresh-images?key=${key}" target="_blank">Refresh All Images</a>
   <a href="/admin/run-seed?key=${key}" target="_blank">Run Seed</a>
 </div>
 <table>
-  <thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Image</th><th>Created</th><th>Action</th></tr></thead>
+  <thead><tr><th>ID</th><th>Title &amp; Image</th><th>Category</th><th>Created</th><th>Actions</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>
+<script>
+function toggleReplace(id) {
+  const row = document.getElementById('replace-row-' + id);
+  const visible = row.style.display !== 'none';
+  row.style.display = visible ? 'none' : 'table-row';
+  if (!visible) document.getElementById('url-' + id).focus();
+}
+
+function previewImage(id) {
+  const url = document.getElementById('url-' + id).value.trim();
+  const box = document.getElementById('preview-' + id);
+  const img = document.getElementById('preview-img-' + id);
+  const err = document.getElementById('preview-err-' + id);
+  if (!url) return;
+  box.style.display = 'block';
+  err.style.display = 'none';
+  img.style.display = 'block';
+  img.src = url;
+  img.onerror = () => { img.style.display = 'none'; err.style.display = 'inline'; };
+}
+
+async function saveImage(id, key) {
+  const url = document.getElementById('url-' + id).value.trim();
+  if (!url) return alert('Paste a URL first.');
+  const res = await fetch('/admin/recipes/' + id + '/image?key=' + key, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_url: url }),
+  });
+  if (!res.ok) return alert('Save failed.');
+  // Update thumbnail in-place
+  const thumb = document.getElementById('thumb-' + id);
+  if (thumb.tagName === 'IMG') {
+    thumb.src = url;
+  } else {
+    const img = document.createElement('img');
+    img.id = 'thumb-' + id;
+    img.src = url;
+    img.style = 'width:50px;height:50px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;';
+    thumb.replaceWith(img);
+  }
+  document.getElementById('replace-row-' + id).style.display = 'none';
+}
+</script>
 </body></html>`);
 });
 
@@ -186,6 +252,14 @@ app.post('/admin/recipes/:id/delete', (req, res) => {
   if (req.query.key !== 'fatswitchdev2026') return res.status(403).send('Forbidden');
   db.prepare('DELETE FROM recipes WHERE id = ?').run([req.params.id]);
   res.redirect(`/admin/recipes?key=${req.query.key}`);
+});
+
+app.post('/admin/recipes/:id/image', (req, res) => {
+  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
+  const { image_url } = req.body;
+  if (!image_url) return res.status(400).json({ error: 'image_url required' });
+  db.prepare('UPDATE recipes SET image_url = ? WHERE id = ?').run([image_url, req.params.id]);
+  res.json({ ok: true });
 });
 
 app.get('/admin/dedupe', (req, res) => {
