@@ -112,6 +112,8 @@ app.get('/about', (req, res) => res.render('about', { categories: getCategories(
 app.get('/contact', (req, res) => res.render('contact', { categories: getCategories(), page: 'contact' }));
 app.get('/privacy', (req, res) => res.render('privacy', { categories: getCategories(), page: 'privacy' }));
 
+app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
+
 app.get('/google3e9b317ccdb7eb55.html', (req, res) => {
   res.type('text/html').send('google-site-verification: google3e9b317ccdb7eb55.html');
 });
