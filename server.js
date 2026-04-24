@@ -131,6 +131,90 @@ app.get('/admin/db-status', (req, res) => {
   });
 });
 
+app.get('/admin/recipes', (req, res) => {
+  if (req.query.key !== 'fatswitchdev2026') return res.status(403).send('Forbidden');
+  const recipes = db.prepare(`
+    SELECT r.id, r.title, r.slug, r.created_at, r.image_url, c.name as category
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    ORDER BY r.id DESC
+  `).all();
+
+  const key = req.query.key;
+  const rows = recipes.map((r) => `
+    <tr>
+      <td>${r.id}</td>
+      <td><a href="/recipe/${r.slug}" target="_blank">${r.title}</a></td>
+      <td>${r.category || '—'}</td>
+      <td>${r.image_url ? '✓' : '✗'}</td>
+      <td>${(r.created_at || '').slice(0, 16)}</td>
+      <td>
+        <form method="POST" action="/admin/recipes/${r.id}/delete?key=${key}" onsubmit="return confirm('Delete ${r.title.replace(/'/g, "\\'")}?')">
+          <button type="submit" style="background:#e53e3e;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">Delete</button>
+        </form>
+      </td>
+    </tr>`).join('');
+
+  res.send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Admin – Recipes</title>
+<style>
+  body{font-family:sans-serif;padding:2rem;background:#f7f7f7}
+  h1{margin-bottom:1rem}
+  .actions{margin-bottom:1rem;display:flex;gap:1rem;align-items:center}
+  table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+  th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #eee;font-size:0.9rem}
+  th{background:#2d6a4f;color:#fff}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#f0fdf4}
+  a{color:#2d6a4f}
+</style></head>
+<body>
+<h1>Recipes (${recipes.length})</h1>
+<div class="actions">
+  <a href="/admin/db-status?key=${key}">DB Status</a>
+  <a href="/admin/dedupe?key=${key}" onclick="return confirm('Remove all duplicates?')">Run Dedupe</a>
+  <a href="/admin/refresh-images?key=${key}" target="_blank">Refresh Images</a>
+  <a href="/admin/run-seed?key=${key}" target="_blank">Run Seed</a>
+</div>
+<table>
+  <thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Image</th><th>Created</th><th>Action</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+</body></html>`);
+});
+
+app.post('/admin/recipes/:id/delete', (req, res) => {
+  if (req.query.key !== 'fatswitchdev2026') return res.status(403).send('Forbidden');
+  db.prepare('DELETE FROM recipes WHERE id = ?').run([req.params.id]);
+  res.redirect(`/admin/recipes?key=${req.query.key}`);
+});
+
+app.get('/admin/dedupe', (req, res) => {
+  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
+
+  // Find duplicate titles (case-insensitive), keep the highest id (latest), delete the rest
+  const dupes = db.prepare(`
+    SELECT id, title FROM recipes
+    WHERE LOWER(title) IN (
+      SELECT LOWER(title) FROM recipes GROUP BY LOWER(title) HAVING COUNT(*) > 1
+    )
+    AND id NOT IN (
+      SELECT MAX(id) FROM recipes GROUP BY LOWER(title)
+    )
+  `).all();
+
+  if (dupes.length === 0) {
+    return res.json({ removed: 0, message: 'No duplicates found.' });
+  }
+
+  const ids = dupes.map((r) => r.id);
+  db.prepare(`DELETE FROM recipes WHERE id IN (${ids.map(() => '?').join(',')})`).run(ids);
+
+  res.json({
+    removed: dupes.length,
+    titles: dupes.map((r) => r.title),
+  });
+});
+
 app.get('/sitemap.xml', (req, res) => {
   const base = `${req.protocol}://${req.get('host')}`;
   const recipes = db.prepare('SELECT slug, created_at FROM recipes ORDER BY created_at DESC').all();
