@@ -7,9 +7,18 @@ const dbPath = dbBase.endsWith('.db') ? dbBase : path.join(dbBase, 'recipes.db')
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
+// Clear stale lock artifacts left by crashed processes
+const lockDir = dbPath + '.lock';
+const walFile = dbPath + '-wal';
+const shmFile = dbPath + '-shm';
+if (fs.existsSync(lockDir)) { fs.rmSync(lockDir, { recursive: true, force: true }); console.log('[db] cleared stale .lock dir'); }
+if (fs.existsSync(walFile)) { fs.rmSync(walFile, { force: true }); console.log('[db] cleared stale -wal file'); }
+if (fs.existsSync(shmFile)) { fs.rmSync(shmFile, { force: true }); console.log('[db] cleared stale -shm file'); }
+
 const db = new Database(dbPath);
 
 db.run('PRAGMA journal_mode = WAL');
+db.run('PRAGMA busy_timeout = 5000');
 db.run('PRAGMA foreign_keys = ON');
 
 db.run(`
