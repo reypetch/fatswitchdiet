@@ -1,130 +1,125 @@
-<%
-  pageTitle = 'FatSwitchDiet — Indulgent Recipes, Smarter Calories';
-  metaDesc  = 'Discover delicious international recipes with the Fat Switch — same great taste, dramatically fewer calories.';
-  canonicalUrl = '/';
-%>
-<%- include('partials/header') %>
+<%- include('partials/header', { title: 'Healthy Recipes & Meal Plans' }) %>
 
-<!-- ══ HERO ══ -->
-<section class="homepage-hero">
-  <div class="hero-content">
-    <p class="hero-eyebrow">✦ <%= total %> Fat Switched Recipes & Growing</p>
-    <h1 class="hero-title">Eat What You <em>Love.</em><br>Switch the Fat.</h1>
-    <p class="hero-subtitle">Every recipe comes with a Fat Switch — same great taste, dramatically fewer calories. No sacrifice required.</p>
-    <div class="hero-search">
-      <input type="text" id="heroSearch" placeholder="Search recipes… e.g. Chicken Alfredo" autocomplete="off">
-      <button onclick="doSearch()">Search →</button>
+<section class="hero">
+  <div class="container">
+    <h1>Switch Your Diet,<br>Switch Your Life</h1>
+    <p>Science-backed recipes and AI-powered meal plans designed to optimize fat-burning and metabolic health.</p>
+    <div class="hero-badges">
+      <span class="badge">🔬 Science-Based</span>
+      <span class="badge">🤖 AI-Powered</span>
+      <span class="badge">🥗 500+ Recipes</span>
+      <span class="badge">📋 Custom Diet Plans</span>
     </div>
-    <div style="margin-top:20px">
-      <a href="/generator" class="btn btn-primary" style="background:var(--amber);font-size:0.9rem">⚡ Generate Any Recipe with AI →</a>
+    <div class="flex gap-2" style="justify-content:center; flex-wrap:wrap;">
+      <a href="/generator" class="btn btn-outline btn-lg">✨ Generate a Recipe</a>
+      <a href="/diet-plan" class="btn btn-lg" style="background:var(--orange);color:white;">📋 Get a Diet Plan</a>
     </div>
   </div>
 </section>
 
-<div class="page-wrap">
-
-  <!-- AD SLOT -->
-  <div class="ad-slot">
-    <span class="ad-slot-label">Advertisement</span>
-    <span class="ad-slot-size">728×90 — Leaderboard</span>
+<section class="section">
+  <div class="container">
+    <h2 class="section-title">Browse by Category</h2>
+    <p class="section-subtitle">Find exactly what you're looking for</p>
+    <div class="category-grid">
+      <% categories.forEach(cat => { %>
+        <a href="/category/<%= cat.slug %>" class="category-pill">
+          <%= cat.icon %> <%= cat.name %>
+        </a>
+      <% }) %>
+    </div>
   </div>
+</section>
 
-  <!-- CATEGORY PILLS -->
-  <div class="category-pills">
-    <a href="/" class="category-pill active">All Recipes</a>
-    <a href="/category/breakfast" class="category-pill">🍳 Breakfast</a>
-    <a href="/category/lunch" class="category-pill">🥗 Lunch</a>
-    <a href="/category/dinner" class="category-pill">🍽️ Dinner</a>
-    <a href="/category/asian" class="category-pill">🥢 Asian</a>
-    <a href="/category/western" class="category-pill">🍔 Western</a>
-    <a href="/category/dessert" class="category-pill">🍮 Dessert</a>
-  </div>
-
-  <% if (recipes.length === 0) { %>
-  <!-- ══ EMPTY STATE — show generator CTA ══ -->
-  <div style="text-align:center;padding:80px 24px">
-    <div style="font-size:4rem;margin-bottom:16px">🍽️</div>
-    <h2>No recipes yet — let's create the first one!</h2>
-    <p style="color:var(--text-mid);margin-bottom:24px">Use the AI Generator to instantly create your first Fat Switch recipe.</p>
-    <a href="/generator" class="btn btn-primary">⚡ Generate First Recipe →</a>
-  </div>
-
-  <% } else { %>
-
-  <!-- ══ LATEST RECIPES GRID ══ -->
-  <div class="section-title-bar">
-    <h2>Latest Recipes</h2>
-    <a href="/generator" class="btn btn-primary" style="font-size:0.82rem">⚡ Generate New Recipe</a>
-  </div>
-
-  <div class="recipe-grid" id="recipeGrid">
-    <% recipes.forEach(function(r, i) { %>
-    <a href="/recipe/<%= r.slug %>" style="text-decoration:none">
-      <div class="recipe-card fade-up fade-up-<%= (i % 3) + 1 %>">
-        <div class="recipe-card-img-placeholder">
-          <%= r.cuisine === 'Japanese' ? '🍱' : r.cuisine === 'Korean' ? '🥢' : r.cuisine === 'Thai' ? '🍜' : r.cuisine === 'Italian' ? '🍝' : r.category === 'Breakfast' ? '🍳' : r.category === 'Dessert' ? '🍮' : '🍽️' %>
-        </div>
-        <div class="recipe-card-body">
-          <div class="recipe-card-meta">
-            <span class="tag tag-category"><%= r.category %></span>
-            <% if (r.savings_pct) { %><span class="tag tag-swap">⚡ <%= r.savings_pct %>% less calories</span><% } %>
-          </div>
-          <div class="recipe-card-title"><%= r.title %></div>
-          <div class="recipe-card-desc"><%= r.description ? r.description.substring(0, 100) + '…' : '' %></div>
-          <div class="recipe-card-stats">
-            <span>🍽️ <strong><%= r.cuisine %></strong></span>
-            <% if (r.kcal) { %><span>✅ <strong><%= r.kcal %> kcal</strong></span><% } %>
-            <span>👁 <%= r.views %></span>
+<% if (featured.length > 0) { %>
+<section class="section" style="background: var(--white);">
+  <div class="container">
+    <h2 class="section-title">⭐ Featured Recipes</h2>
+    <p class="section-subtitle">Hand-picked favorites for your fat-switching journey</p>
+    <div class="grid grid-3">
+      <% featured.forEach(recipe => { %>
+        <div class="card">
+          <% if (recipe.image_url) { %>
+            <img class="card-img" src="<%= recipe.image_url %>" alt="<%= recipe.title %>" loading="lazy" onerror="this.style.display='none'">
+          <% } else { %>
+            <div class="card-img-placeholder"><%= recipe.category_name === 'Smoothies' ? '🥤' : recipe.category_name === 'Breakfast' ? '🌅' : recipe.category_name === 'Desserts' ? '🍓' : '🥗' %></div>
+          <% } %>
+          <div class="card-body">
+            <% if (recipe.category_name) { %><span class="card-category"><%= recipe.category_name %></span><% } %>
+            <h3 class="card-title"><a href="/recipe/<%= recipe.slug %>"><%= recipe.title %></a></h3>
+            <p class="card-desc"><%= recipe.description %></p>
+            <div class="card-meta">
+              <% if (recipe.prep_time) { %><span>⏱ <%= recipe.prep_time + (recipe.cook_time || 0) %> min</span><% } %>
+              <% if (recipe.calories) { %><span>🔥 <%= recipe.calories %> cal</span><% } %>
+              <% if (recipe.protein) { %><span>💪 <%= recipe.protein %>g protein</span><% } %>
+            </div>
           </div>
         </div>
+      <% }) %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<section class="section">
+  <div class="container">
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:2rem; text-align:center;">
+      <div style="padding:2rem; background:white; border-radius:var(--radius); box-shadow:var(--shadow);">
+        <div style="font-size:3rem;margin-bottom:1rem;">🤖</div>
+        <h3 style="margin-bottom:0.5rem;">AI Recipe Generator</h3>
+        <p style="color:var(--gray-600);margin-bottom:1.5rem;">Describe what you want and Claude AI creates a personalized, nutritionist-approved recipe in seconds.</p>
+        <a href="/generator" class="btn btn-primary">Try It Free</a>
       </div>
-    </a>
-    <% }) %>
+      <div style="padding:2rem; background:white; border-radius:var(--radius); box-shadow:var(--shadow);">
+        <div style="font-size:3rem;margin-bottom:1rem;">📋</div>
+        <h3 style="margin-bottom:0.5rem;">7-Day Diet Plans</h3>
+        <p style="color:var(--gray-600);margin-bottom:1.5rem;">Get a complete personalized meal plan tailored to your goals, preferences, and lifestyle.</p>
+        <a href="/diet-plan" class="btn btn-primary">Get Your Plan</a>
+      </div>
+      <div style="padding:2rem; background:white; border-radius:var(--radius); box-shadow:var(--shadow);">
+        <div style="font-size:3rem;margin-bottom:1rem;">🔬</div>
+        <h3 style="margin-bottom:0.5rem;">Science-Based</h3>
+        <p style="color:var(--gray-600);margin-bottom:1.5rem;">Every recipe is crafted around the Fat Switch principle — optimizing metabolic pathways for sustainable weight loss.</p>
+        <a href="/about" class="btn btn-primary">Learn More</a>
+      </div>
+    </div>
   </div>
+</section>
 
-  <% } %>
-
-  <!-- AD SLOT MID -->
-  <div class="ad-slot" style="margin-top:40px">
-    <span class="ad-slot-label">Advertisement</span>
-    <span class="ad-slot-size">728×90 — Leaderboard</span>
+<% if (recent.length > 0) { %>
+<section class="section" style="background: var(--white);">
+  <div class="container">
+    <h2 class="section-title">🆕 Latest Recipes</h2>
+    <p class="section-subtitle">Fresh additions to the FatSwitchDiet collection</p>
+    <div class="grid grid-4">
+      <% recent.forEach(recipe => { %>
+        <div class="card">
+          <% if (recipe.image_url) { %>
+            <img class="card-img" src="<%= recipe.image_url %>" alt="<%= recipe.title %>" loading="lazy" onerror="this.style.display='none'">
+          <% } else { %>
+            <div class="card-img-placeholder" style="height:160px; font-size:3rem;">🥗</div>
+          <% } %>
+          <div class="card-body">
+            <% if (recipe.ai_generated) { %><span class="ai-badge mb-1">🤖 AI</span><% } %>
+            <h3 class="card-title" style="font-size:1rem;"><a href="/recipe/<%= recipe.slug %>"><%= recipe.title %></a></h3>
+            <div class="card-meta">
+              <% if (recipe.calories) { %><span>🔥 <%= recipe.calories %></span><% } %>
+              <% if (recipe.protein) { %><span>💪 <%= recipe.protein %>g</span><% } %>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
   </div>
+</section>
+<% } %>
 
-  <!-- ══ AI GENERATOR CTA STRIP ══ -->
-  <div style="background:var(--forest);border-radius:var(--radius-lg);padding:48px 40px;text-align:center;margin:48px 0;position:relative;overflow:hidden;">
-    <div style="position:absolute;top:-40px;right:-40px;font-size:8rem;opacity:0.08;transform:rotate(15deg)">⚡</div>
-    <p style="font-family:var(--font-ui);font-size:0.78rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--amber-light);margin-bottom:8px">Powered by AI</p>
-    <h2 style="color:var(--cream);font-size:1.8rem;margin-bottom:12px">Can't Find Your Recipe?</h2>
-    <p style="color:rgba(250,247,240,0.7);max-width:440px;margin:0 auto 28px;font-size:0.95rem">Type any dish name and our AI generates a complete Fat Switch recipe in seconds — with full nutrition comparison, ingredient swaps, and SEO-ready page.</p>
-    <a href="/generator" class="btn btn-primary" style="font-size:1rem;padding:14px 32px">⚡ Generate a Recipe Now →</a>
+<section class="cta-section">
+  <div class="container">
+    <h2>Ready to Switch Your Diet?</h2>
+    <p>Generate your first personalized recipe with AI — it takes less than 30 seconds.</p>
+    <a href="/generator" class="btn btn-outline btn-lg">✨ Generate My First Recipe</a>
   </div>
-
-  <!-- ══ DIET PLAN CTA STRIP ══ -->
-  <div style="background:linear-gradient(135deg,var(--amber),#E8850A);border-radius:var(--radius-lg);padding:48px 40px;text-align:center;margin:0 0 48px;position:relative;overflow:hidden;">
-    <div style="position:absolute;top:-30px;left:-30px;font-size:8rem;opacity:0.1">📋</div>
-    <p style="font-family:var(--font-ui);font-size:0.78rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.8);margin-bottom:8px">Free AI Tool</p>
-    <h2 style="color:var(--white);font-size:1.8rem;margin-bottom:12px">Get Your Free 7-Day Diet Plan</h2>
-    <p style="color:rgba(255,255,255,0.85);max-width:440px;margin:0 auto 28px;font-size:0.95rem">Answer 4 questions — our AI builds a personalised meal plan with daily calorie targets, breakfast to dinner, Fat Switch swaps included.</p>
-    <a href="/diet-plan" class="btn" style="background:var(--white);color:var(--amber);font-size:1rem;padding:14px 32px;font-weight:700">📋 Build My Plan Free →</a>
-  </div>
-
-  <!-- AD SLOT BOTTOM -->
-  <div class="ad-slot">
-    <span class="ad-slot-label">Advertisement</span>
-    <span class="ad-slot-size">300×250 — Medium Rectangle</span>
-  </div>
-
-</div>
-
-<script>
-function doSearch() {
-  const q = document.getElementById('heroSearch').value.trim();
-  if (!q) return;
-  window.location.href = '/api/search?q=' + encodeURIComponent(q);
-}
-document.getElementById('heroSearch').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doSearch();
-});
-</script>
+</section>
 
 <%- include('partials/footer') %>

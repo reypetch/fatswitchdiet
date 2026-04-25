@@ -3,30 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= typeof pageTitle !== 'undefined' ? pageTitle : 'FatSwitchDiet — Indulgent Recipes, Smarter Calories' %></title>
-  <meta name="description" content="<%= typeof metaDesc !== 'undefined' ? metaDesc : 'Discover delicious international recipes with the Fat Switch — same great taste, dramatically fewer calories.' %>">
-  <% if (typeof canonicalUrl !== 'undefined') { %><link rel="canonical" href="https://fatswitchdiet.com<%= canonicalUrl %>"><% } %>
-  <% if (typeof extraHead !== 'undefined') { %><%- extraHead %><% } %>
+  <meta name="description" content="FatSwitchDiet – Science-based recipes and meal plans to optimize fat-burning and metabolic health.">
+  <title><%= typeof title !== 'undefined' ? title + ' | FatSwitchDiet' : 'FatSwitchDiet – Recipes for Metabolic Health' %></title>
   <link rel="stylesheet" href="/style.css">
-  <!-- Google AdSense -->
-  <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script> -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥗</text></svg>">
 </head>
 <body>
-
-<header class="site-header">
-  <div class="header-inner">
-    <a href="/" class="site-logo">FatSwitch<span>Diet</span></a>
-    <nav class="site-nav" id="siteNav">
-      <a href="/">Home</a>
-      <a href="/category/breakfast">Breakfast</a>
-      <a href="/category/lunch">Lunch</a>
-      <a href="/category/dinner">Dinner</a>
-      <a href="/category/asian">Asian</a>
-      <a href="/generator" style="color:var(--amber-light)!important">⚡ AI Generator</a>
-      <a href="/diet-plan" style="color:var(--amber-light)!important">📋 Diet Plan</a>
-      <a href="/about">About</a>
-      <a href="/contact" class="nav-cta">Contact</a>
-    </nav>
-    <button class="mobile-menu-btn" id="menuBtn" aria-label="Menu">☰</button>
-  </div>
-</header>
+  <nav class="navbar">
+    <div class="container navbar-inner">
+      <a href="/" class="navbar-brand">🥗 Fat<span>Switch</span>Diet</a>
+      <ul class="navbar-nav">
+        <li><a href="/" class="<%= page === 'home' ? 'active' : '' %>">Home</a></li>
+        <% if (typeof categories !== 'undefined') { %>
+          <% categories.slice(0, 3).forEach(cat => { %>
+            <li><a href="/category/<%= cat.slug %>"><%= cat.name %></a></li>
+          <% }) %>
+        <% } %>
+        <li><a href="/diet-plan" class="<%= page === 'diet-plan' ? 'active' : '' %>">Diet Plans</a></li>
+        <li><a href="/generator" class="btn-nav <%= page === 'generator' ? 'active' : '' %>">✨ AI Generator</a></li>
+      </ul>
+    </div>
+  </nav>
+  <main>
