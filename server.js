@@ -149,7 +149,8 @@ app.get('/recipe/:slug', (req, res) => {
   recipe.category_name = recipe.category_name || recipe.category;
   recipe.category_slug = recipe.category_slug || (recipe.category || '').toLowerCase();
 
-  res.render('recipe', { recipe, formatDate, page: 'recipe', categories: db.getCategories() });
+  const related = db.getRecentRecipes(6).filter(r => r.slug !== recipe.slug).slice(0, 3);
+  res.render('recipe', { recipe, formatDate, page: 'recipe', categories: db.getCategories(), related });
 });
 
 // ── Category Page ─────────────────────────────────────────────
@@ -166,7 +167,7 @@ app.get('/category/:cat', (req, res) => {
 app.get('/about',          (req, res) => res.render('about',      { page: 'about',      categories: db.getCategories() }));
 app.get('/contact',        (req, res) => res.render('contact',    { page: 'contact',    categories: db.getCategories() }));
 app.get('/privacy-policy', (req, res) => res.render('privacy',    { page: 'privacy',    categories: db.getCategories() }));
-app.get('/diet-plan',      (req, res) => res.render('diet-plan',  { page: 'diet-plan',  categories: db.getCategories() }));
+app.get('/diet-plan',      (req, res) => res.render('diet-plan',  { page: 'diet-plan',  categories: db.getCategories(), plans: [] }));
 
 // ════════════════════════════════════════════════════════════
 //  API ROUTES
@@ -391,6 +392,77 @@ Requirements:
     const plan  = JSON.parse(clean);
 
     if (!plan.days || plan.days.length !== 7) {
+      throw new Error('Invalid plan structure from AI.');
+    }
+
+    res.json({ success: true, plan });
+
+  } catch (err) {
+    console.error('Diet plan error:', err.message);
+    if (err instanceof SyntaxError) {
+      return res.status(500).json({ error: 'AI returned unexpected format. Please try again.' });
+    }
+    res.status(500).json({ error: 'Plan generation failed. Please try again in a moment.' });
+  }
+});
+
+// ── POST /api/generate-diet-plan ─────────────────────────────
+app.post('/api/generate-diet-plan', async (req, res) => {
+  const { goal, duration, calories, restrictions } = req.body;
+
+  if (!goal) return res.status(400).json({ error: 'Please select a goal.' });
+
+  const durationDays = parseInt(duration) || 7;
+  const calorieTarget = parseInt(calories) || null;
+  const restrictStr = Array.isArray(restrictions) && restrictions.length
+    ? restrictions.join(', ')
+    : 'None';
+
+  const prompt = `You are a professional nutritionist for FatSwitchDiet.com, specialising in healthy ingredient swaps.
+
+Create a personalised ${durationDays}-day meal plan for:
+- Goal: ${goal}
+- Daily calorie target: ${calorieTarget ? calorieTarget + ' kcal' : 'auto (choose appropriate for goal)'}
+- Dietary restrictions: ${restrictStr}
+
+Return ONLY valid JSON. No markdown, no backticks, no extra text. Exact structure:
+
+{
+  "name": "Catchy plan name (e.g. '7-Day Fat Switch Reset')",
+  "description": "2-3 sentence summary of the plan and its benefits",
+  "duration_days": ${durationDays},
+  "calories_per_day": 1800,
+  "goal": "${goal}",
+  "meal_plan": [
+    {
+      "day": 1,
+      "breakfast": { "name": "Meal name", "calories": 380, "notes": "Brief fat-switch tip" },
+      "lunch":     { "name": "Meal name", "calories": 450, "notes": "Brief fat-switch tip" },
+      "dinner":    { "name": "Meal name", "calories": 520, "notes": "Brief fat-switch tip" },
+      "snack":     { "name": "Meal name", "calories": 180, "notes": "Brief fat-switch tip" }
+    }
+  ]
+}
+
+Requirements:
+- Exactly ${durationDays} entries in meal_plan (day 1 through ${durationDays})
+- Every day must have breakfast, lunch, dinner, and snack
+- Vary meals — no repeated dishes across the plan
+- All calorie numbers must be realistic and consistent with calories_per_day
+- Keep meals practical and easy to prepare`;
+
+  try {
+    const message = await claude.messages.create({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const raw   = message.content[0].text.trim();
+    const clean = raw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const plan  = JSON.parse(clean);
+
+    if (!plan.meal_plan || !Array.isArray(plan.meal_plan) || plan.meal_plan.length === 0) {
       throw new Error('Invalid plan structure from AI.');
     }
 

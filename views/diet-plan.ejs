@@ -87,9 +87,6 @@
   <% } %>
 </div>
 
-<%- include('partials/footer') %>
-
-<% extraScripts = `
 <script>
 const form = document.getElementById('planForm');
 const btn = document.getElementById('planBtn');
@@ -123,35 +120,35 @@ form.addEventListener('submit', async (e) => {
     if (!res.ok || !data.success) throw new Error(data.error || 'Generation failed');
 
     const p = data.plan;
-    const daysHtml = p.meal_plan.map(day => \`
+    const daysHtml = p.meal_plan.map(day => `
       <div class="day-card">
-        <div class="day-header">Day \${day.day}</div>
+        <div class="day-header">Day ${day.day}</div>
         <div class="day-meals">
-          \${['breakfast','lunch','dinner','snack'].map(m => day[m] ? \`
+          ${['breakfast','lunch','dinner','snack'].map(m => day[m] ? `
             <div class="meal-item">
-              <div class="meal-type">\${m}</div>
-              <div class="meal-name">\${day[m].name}</div>
-              <div class="meal-cal">\${day[m].calories} cal · \${day[m].notes || ''}</div>
+              <div class="meal-type">${m}</div>
+              <div class="meal-name">${day[m].name}</div>
+              <div class="meal-cal">${day[m].calories} cal · ${day[m].notes || ''}</div>
             </div>
-          \` : '').join('')}
+          ` : '').join('')}
         </div>
       </div>
-    \`).join('');
+    `).join('');
 
-    planContent.innerHTML = \`
+    planContent.innerHTML = `
       <div class="alert alert-success">✅ Your plan is ready!</div>
-      <h2 style="margin-bottom:0.5rem; color:var(--green-dark);">\${p.name}</h2>
-      <p style="color:var(--gray-600); margin-bottom:1rem;">\${p.description}</p>
+      <h2 style="margin-bottom:0.5rem; color:var(--green-dark);">${p.name}</h2>
+      <p style="color:var(--gray-600); margin-bottom:1rem;">${p.description}</p>
       <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;">
-        <span>📅 \${p.duration_days} days</span>
-        \${p.calories_per_day ? \`<span>🔥 ~\${p.calories_per_day} cal/day</span>\` : ''}
-        <span>🎯 \${p.goal}</span>
+        <span>📅 ${p.duration_days} days</span>
+        ${p.calories_per_day ? `<span>🔥 ~${p.calories_per_day} cal/day</span>` : ''}
+        <span>🎯 ${p.goal}</span>
       </div>
-      \${daysHtml}
-    \`;
+      ${daysHtml}
+    `;
     planContent.style.display = 'block';
   } catch (err) {
-    planError.innerHTML = \`<div class="alert alert-error">❌ \${err.message}</div>\`;
+    planError.innerHTML = `<div class="alert alert-error">❌ ${err.message}</div>`;
     planError.style.display = 'block';
     placeholder.style.display = 'block';
   } finally {
@@ -160,4 +157,5 @@ form.addEventListener('submit', async (e) => {
   }
 });
 </script>
-`; %>
+
+<%- include('partials/footer') %>
