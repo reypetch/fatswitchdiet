@@ -149,7 +149,6 @@ app.get('/diet-plan',      (req, res) => res.render('diet-plan', { categories: d
 // ════════════════════════════════════════════════════════════
 
 // ── POST /api/generate ────────────────────────────────────────
-// FIX: Only saves to DB when valid adminKey is provided in request body
 app.post('/api/generate', async (req, res) => {
   const { keyword, category, dietary, adminKey } = req.body;
 
@@ -157,7 +156,6 @@ app.post('/api/generate', async (req, res) => {
     return res.status(400).json({ error: 'Please enter a recipe keyword.' });
   }
 
-  // FIX: Check admin key from request body
   const isAdmin = adminKey === ADMIN_KEY;
 
   try {
@@ -184,7 +182,6 @@ app.post('/api/generate', async (req, res) => {
     const slug = makeSlug(data.title);
 
     if (isAdmin) {
-      // FIX: Only save to DB when admin
       db.saveRecipe({
         slug,
         title:    data.title,
@@ -194,7 +191,6 @@ app.post('/api/generate', async (req, res) => {
         data
       });
 
-      // FIX: Verify recipe actually saved before returning slug (prevents 404 bug)
       const saved = db.getRecipe(slug);
       if (!saved) {
         return res.status(500).json({ error: 'Recipe generated but failed to save. Please try again.' });
