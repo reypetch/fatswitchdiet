@@ -68,6 +68,10 @@ app.get('/', (req, res) => {
   res.render('index', { featured, recent, categories: getCategories(), page: 'home' });
 });
 
+app.get('/recipe/preview', (req, res) => {
+  res.render('recipe-preview', { categories: getCategories(), page: 'generator' });
+});
+
 app.get('/recipe/:slug', (req, res) => {
   const recipe = db.prepare(`
     SELECT r.*, c.name as category_name, c.slug as category_slug
@@ -101,11 +105,8 @@ app.get('/category/:slug', (req, res) => {
 
 app.get('/generator', (req, res) => {
   const adminMode = req.query.admin === 'fatswitchdev2026';
+  console.log(`[generator] adminMode=${adminMode} (query.admin=${req.query.admin || 'none'})`);
   res.render('generator', { categories: getCategories(), page: 'generator', adminMode });
-});
-
-app.get('/recipe/preview', (req, res) => {
-  res.render('recipe-preview', { categories: getCategories(), page: 'generator' });
 });
 
 app.get('/diet-plan', (req, res) => {
@@ -352,6 +353,7 @@ Respond ONLY with valid JSON in this exact format:
 
 async function saveRecipe(recipeData, category) {
   const slug = slugify(recipeData.title, { lower: true, strict: true }) + '-' + Date.now();
+  console.log(`[saveRecipe] saving slug="${slug}" title="${recipeData.title}"`);
   const catRow = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
   const imageUrl = await getUnsplashImage(recipeData.title);
 
@@ -520,14 +522,17 @@ app.post('/api/generate-recipe', aiLimiter, async (req, res) => {
     if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
 
     const isAdmin = admin_key === 'fatswitchdev2026';
+    console.log(`[generate-recipe] admin_key received=${!!admin_key} isAdmin=${isAdmin} prompt="${prompt}"`);
+
     const recipeData = await generateRecipe(prompt, category, servings, dietary);
 
     if (isAdmin) {
       const recipe = await saveRecipe(recipeData, category);
+      console.log(`[generate-recipe] saved=true slug="${recipe.slug}"`);
       return res.json({ success: true, recipe, saved: true });
     }
 
-    // Public mode — return recipe data only, no DB write
+    console.log(`[generate-recipe] saved=false (public mode)`);
     res.json({ success: true, recipe: recipeData, saved: false });
   } catch (err) {
     console.error('Recipe generation error:', err);
