@@ -185,7 +185,7 @@ app.post('/api/generate', async (req, res) => {
       db.saveRecipe({
         slug,
         title:    data.title,
-        category: data.category || 'Dinner',
+        category: category || data.category || 'Dinner',
         cuisine:  data.cuisine  || 'International',
         keyword:  keyword.trim(),
         data

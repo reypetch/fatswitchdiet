@@ -362,50 +362,12 @@
     </div>
   </div>
 
-  <!-- ══ RECENTLY GENERATED ══ -->
-  <div style="max-width:680px;margin:0 auto 60px">
-    <h2 style="margin-bottom:16px">Recently Added Recipes</h2>
-    <div id="recentRecipes" style="background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--border);padding:8px 20px">
-      <p style="color:var(--text-light);font-size:0.9rem;text-align:center;padding:20px 0">Loading recent recipes…</p>
-    </div>
-  </div>
-
 </div>
 
 <script>
 // ── Admin mode flag from server ──
 const IS_ADMIN = <%= isAdmin ? 'true' : 'false' %>;
 const ADMIN_KEY = IS_ADMIN ? 'fatswitchdev2026' : null;
-
-// ── Load recent recipes on page load ──
-(async function loadRecent() {
-  try {
-    const res  = await fetch('/api/recipes');
-    const data = await res.json();
-    const container = document.getElementById('recentRecipes');
-    if (!data.length) {
-      container.innerHTML = '<p style="color:var(--text-light);font-size:0.9rem;text-align:center;padding:20px 0">No recipes yet — generate the first one!</p>';
-      return;
-    }
-    container.innerHTML = `<ul class="recent-list">
-      ${data.slice(0, 8).map(r => `
-        <li>
-          <span style="font-size:1.2rem">${getCuisineEmoji(r.cuisine)}</span>
-          <a href="/recipe/${r.slug}">${r.title}</a>
-          <span class="recent-badge">${r.category}</span>
-          ${r.savings_pct ? `<span class="recent-badge" style="background:#EBF5ED;color:#155724">↓${r.savings_pct}% kcal</span>` : ''}
-        </li>
-      `).join('')}
-    </ul>`;
-  } catch(e) {
-    console.error(e);
-  }
-})();
-
-function getCuisineEmoji(cuisine) {
-  const map = { Japanese:'🍱', Korean:'🥢', Thai:'🍜', Italian:'🍝', Chinese:'🥟', Indian:'🍛', Mexican:'🌮', French:'🥐', American:'🍔', Mediterranean:'🫒' };
-  return map[cuisine] || '🍽️';
-}
 
 // ── Generate Recipe ──
 async function generateRecipe() {
