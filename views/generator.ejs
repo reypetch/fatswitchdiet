@@ -62,9 +62,6 @@
   </div>
 </div>
 
-<%- include('partials/footer') %>
-
-<% extraScripts = `
 <script>
 const form = document.getElementById('generatorForm');
 const btn = document.getElementById('generateBtn');
@@ -100,32 +97,32 @@ if (form) form.addEventListener('submit', async (e) => {
 
     const r = data.recipe;
     const totalTime = (r.prep_time || 0) + (r.cook_time || 0);
-    resultContent.innerHTML = \`
+    resultContent.innerHTML = `
       <div class="alert alert-success">✅ Recipe generated and saved!</div>
-      <h2 style="margin-bottom:0.5rem; color:var(--green-dark);">\${r.title}</h2>
-      <p style="color:var(--gray-600); margin-bottom:1rem;">\${r.description}</p>
+      <h2 style="margin-bottom:0.5rem; color:var(--green-dark);">${r.title}</h2>
+      <p style="color:var(--gray-600); margin-bottom:1rem;">${r.description}</p>
       <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;">
-        \${totalTime ? \`<span>⏱ \${totalTime} min</span>\` : ''}
-        \${r.calories ? \`<span>🔥 \${r.calories} cal</span>\` : ''}
-        \${r.protein ? \`<span>💪 \${r.protein}g protein</span>\` : ''}
-        \${r.carbs ? \`<span>🌾 \${r.carbs}g carbs</span>\` : ''}
-        \${r.fat ? \`<span>🥑 \${r.fat}g fat</span>\` : ''}
+        ${totalTime ? `<span>⏱ ${totalTime} min</span>` : ''}
+        ${r.calories ? `<span>🔥 ${r.calories} cal</span>` : ''}
+        ${r.protein ? `<span>💪 ${r.protein}g protein</span>` : ''}
+        ${r.carbs ? `<span>🌾 ${r.carbs}g carbs</span>` : ''}
+        ${r.fat ? `<span>🥑 ${r.fat}g fat</span>` : ''}
       </div>
       <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">🛒 Ingredients</h3>
       <ul style="list-style:none; margin-bottom:1.5rem;">
-        \${r.ingredients.map(i => \`<li style="padding:0.4rem 0; border-bottom:1px solid var(--gray-100);">✓ \${i}</li>\`).join('')}
+        ${r.ingredients.map(i => `<li style="padding:0.4rem 0; border-bottom:1px solid var(--gray-100);">✓ ${i}</li>`).join('')}
       </ul>
       <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">👨‍🍳 Instructions</h3>
       <ol style="padding-left:1.25rem;">
-        \${r.instructions.map(s => \`<li style="padding:0.4rem 0;">\${s}</li>\`).join('')}
+        ${r.instructions.map(s => `<li style="padding:0.4rem 0;">${s}</li>`).join('')}
       </ol>
       <div style="margin-top:1.5rem;">
-        <a href="/recipe/\${r.slug}" class="btn btn-primary">View Full Recipe →</a>
+        <a href="/recipe/${r.slug}" class="btn btn-primary">View Full Recipe →</a>
       </div>
-    \`;
+    `;
     resultContent.style.display = 'block';
   } catch (err) {
-    errorArea.innerHTML = \`<div class="alert alert-error">❌ \${err.message}</div>\`;
+    errorArea.innerHTML = `<div class="alert alert-error">❌ ${err.message}</div>`;
     errorArea.style.display = 'block';
     placeholder.style.display = 'block';
   } finally {
@@ -134,4 +131,5 @@ if (form) form.addEventListener('submit', async (e) => {
   }
 });
 </script>
-`; %>
+
+<%- include('partials/footer') %>
