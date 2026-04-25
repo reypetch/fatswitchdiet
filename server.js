@@ -104,9 +104,11 @@ Requirements:
 
 // ── Homepage ─────────────────────────────────────────────────
 app.get('/', (req, res) => {
-  const recent = db.getRecentRecipes();
-  const total  = db.getTotalCount();
-  res.render('index', { recipes: recent, total, formatDate });
+  const categories = db.getCategories();
+  const featured   = db.getFeaturedRecipes();
+  const recent     = db.getRecentRecipes();
+  const total      = db.getTotalCount();
+  res.render('index', { categories, featured, recent, recipes: recent, total, formatDate });
 });
 
 // ── Generator Page ───────────────────────────────────────────
