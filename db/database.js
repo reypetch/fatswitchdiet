@@ -139,4 +139,120 @@ if (recipeCount.count === 0) {
   }
 }
 
-module.exports = db;
+// Safe migration: add data column for rich JSON recipe format
+try { db.run('ALTER TABLE recipes ADD COLUMN data TEXT'); } catch (_) {}
+try { db.run('ALTER TABLE recipes ADD COLUMN cuisine TEXT'); } catch (_) {}
+try { db.run('ALTER TABLE recipes ADD COLUMN keyword TEXT'); } catch (_) {}
+try { db.run('ALTER TABLE recipes ADD COLUMN image_url TEXT'); } catch (_) {}
+
+// ── Exported helper methods ───────────────────────────────────
+
+function getCategories() {
+  return db.prepare('SELECT * FROM categories ORDER BY name').all();
+}
+
+function getRecentRecipes(limit = 12) {
+  return db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    ORDER BY r.created_at DESC LIMIT ?
+  `).all(limit);
+}
+
+function getFeaturedRecipes(limit = 6) {
+  return db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    WHERE r.featured = 1 ORDER BY r.created_at DESC LIMIT ?
+  `).all(limit);
+}
+
+function getTotalCount() {
+  return db.prepare('SELECT COUNT(*) as n FROM recipes').get().n;
+}
+
+function getRecipe(slug) {
+  const row = db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    WHERE r.slug = ?
+  `).get([slug]);
+  if (!row) return null;
+  // Parse JSON columns
+  if (typeof row.data === 'string')         { try { row.data         = JSON.parse(row.data);         } catch (_) {} }
+  if (typeof row.ingredients === 'string')  { try { row.ingredients  = JSON.parse(row.ingredients);  } catch (_) {} }
+  if (typeof row.instructions === 'string') { try { row.instructions = JSON.parse(row.instructions); } catch (_) {} }
+  if (typeof row.tags === 'string')         { try { row.tags         = JSON.parse(row.tags);         } catch (_) {} }
+  return row;
+}
+
+function getByCategory(catName) {
+  return db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    WHERE c.name LIKE ?
+    ORDER BY r.created_at DESC
+  `).all([`%${catName}%`]);
+}
+
+function saveRecipe({ slug, title, category, cuisine, keyword, data }) {
+  const catRow = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
+  const desc = data.description || '';
+  db.prepare(`
+    INSERT OR REPLACE INTO recipes
+      (title, slug, description, ingredients, instructions, category_id, prep_time, cook_time,
+       servings, calories, protein, carbs, fat, tags, ai_generated, cuisine, keyword, data)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+  `).run([
+    title, slug, desc,
+    JSON.stringify(data.ingredients || []),
+    JSON.stringify(data.instructions || []),
+    catRow?.id || null,
+    data.prep_time  || null,
+    data.cook_time  || null,
+    data.servings   || 4,
+    data.nutrition?.switched?.calories || null,
+    data.nutrition?.switched?.protein  || null,
+    data.nutrition?.switched?.carbs    || null,
+    data.nutrition?.switched?.fat      || null,
+    JSON.stringify(data.related_keywords || []),
+    cuisine || null,
+    keyword || null,
+    JSON.stringify(data),
+  ]);
+}
+
+function searchRecipes(q) {
+  const like = `%${q}%`;
+  return db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    WHERE r.title LIKE ? OR r.description LIKE ?
+    ORDER BY r.created_at DESC LIMIT 20
+  `).all([like, like]);
+}
+
+function getAllRecipes() {
+  return db.prepare(`
+    SELECT r.*, c.name as category_name, c.slug as category_slug
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    ORDER BY r.created_at DESC
+  `).all();
+}
+
+module.exports = {
+  // Raw db for scripts that need direct access (backfill, admin routes, etc.)
+  prepare: (sql) => db.prepare(sql),
+  run:     (sql, params) => params ? db.prepare(sql).run(params) : db.run(sql),
+  get:     (sql, params) => params ? db.prepare(sql).get(params) : db.get(sql),
+  // Named methods for server.js
+  getCategories,
+  getRecentRecipes,
+  getFeaturedRecipes,
+  getTotalCount,
+  getRecipe,
+  getByCategory,
+  saveRecipe,
+  searchRecipes,
+  getAllRecipes,
+};

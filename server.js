@@ -106,37 +106,43 @@ Requirements:
 
 // ── Homepage ─────────────────────────────────────────────────
 app.get('/', (req, res) => {
-  const recent = db.getRecentRecipes();
-  const total  = db.getTotalCount();
-  res.render('index', { recipes: recent, total, formatDate });
+  const categories = db.getCategories();
+  const featured   = db.getFeaturedRecipes();
+  const recent     = db.getRecentRecipes();
+  const total      = db.getTotalCount();
+  res.render('index', { categories, featured, recent, recipes: recent, total, formatDate, page: 'home' });
 });
 
 // ── Generator Page ───────────────────────────────────────────
-// FIX: Pass isAdmin flag to template based on query param
 app.get('/generator', (req, res) => {
-  const isAdmin = req.query.admin === ADMIN_KEY;
-  res.render('generator', { isAdmin });
+  const isAdmin   = req.query.admin === ADMIN_KEY;
+  const adminMode = isAdmin; // alias used by older template snippets
+  res.render('generator', { isAdmin, adminMode, categories: db.getCategories(), page: 'generator' });
 });
 
 // ── Recipe Page (SSR for SEO) ─────────────────────────────────
+app.get('/recipe/preview', (req, res) => {
+  res.render('recipe-preview', { categories: db.getCategories(), page: 'generator' });
+});
+
 app.get('/recipe/:slug', (req, res) => {
   const recipe = db.getRecipe(req.params.slug);
-  if (!recipe) return res.status(404).render('404');
-  res.render('recipe', { recipe, formatDate });
+  if (!recipe) return res.status(404).render('404', { categories: db.getCategories(), page: '404' });
+  res.render('recipe', { recipe, related: [], formatDate, categories: db.getCategories(), page: 'recipe' });
 });
 
 // ── Category Page ─────────────────────────────────────────────
 app.get('/category/:cat', (req, res) => {
-  const cat = req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1);
+  const cat     = req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1);
   const recipes = db.getByCategory(cat);
-  res.render('category', { recipes, category: cat, formatDate });
+  res.render('category', { recipes, category: cat, formatDate, categories: db.getCategories(), page: 'category' });
 });
 
 // ── Static Pages ──────────────────────────────────────────────
-app.get('/about',          (req, res) => res.render('about'));
-app.get('/contact',        (req, res) => res.render('contact'));
-app.get('/privacy-policy', (req, res) => res.render('privacy'));
-app.get('/diet-plan',      (req, res) => res.render('diet-plan'));
+app.get('/about',          (req, res) => res.render('about',     { categories: db.getCategories(), page: 'about' }));
+app.get('/contact',        (req, res) => res.render('contact',   { categories: db.getCategories(), page: 'contact' }));
+app.get('/privacy-policy', (req, res) => res.render('privacy',   { categories: db.getCategories(), page: 'privacy' }));
+app.get('/diet-plan',      (req, res) => res.render('diet-plan', { categories: db.getCategories(), page: 'diet-plan' }));
 
 // ════════════════════════════════════════════════════════════
 //  API ROUTES
@@ -326,7 +332,7 @@ Requirements:
 });
 
 // ── 404 fallback ──────────────────────────────────────────────
-app.use((req, res) => res.status(404).render('404'));
+app.use((req, res) => res.status(404).render('404', { categories: db.getCategories(), page: '404' }));
 
 // ── Start ─────────────────────────────────────────────────────
 app.listen(PORT, () => {
