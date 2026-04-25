@@ -100,7 +100,12 @@ app.get('/category/:slug', (req, res) => {
 });
 
 app.get('/generator', (req, res) => {
-  res.render('generator', { categories: getCategories(), page: 'generator' });
+  const adminMode = req.query.admin === 'fatswitchdev2026';
+  res.render('generator', { categories: getCategories(), page: 'generator', adminMode });
+});
+
+app.get('/recipe/preview', (req, res) => {
+  res.render('recipe-preview', { categories: getCategories(), page: 'generator' });
 });
 
 app.get('/diet-plan', (req, res) => {
@@ -311,7 +316,7 @@ ${urls}
 
 // ─── AI API Endpoints ───────────────────────────────────────────────────────
 
-async function generateAndSaveRecipe(prompt, category, servings = 4, dietary = []) {
+async function generateRecipe(prompt, category, servings = 4, dietary = []) {
   const dietaryStr = dietary.length ? `Dietary requirements: ${dietary.join(', ')}.` : '';
   const userPrompt = `Create a detailed ${category || 'healthy'} recipe for: "${prompt}"
 Servings: ${servings}. ${dietaryStr}
@@ -342,8 +347,10 @@ Respond ONLY with valid JSON in this exact format:
 
   const jsonMatch = message.content[0].text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('Invalid response format from AI');
-  const recipeData = JSON.parse(jsonMatch[0]);
+  return JSON.parse(jsonMatch[0]);
+}
 
+async function saveRecipe(recipeData, category) {
   const slug = slugify(recipeData.title, { lower: true, strict: true }) + '-' + Date.now();
   const catRow = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
   const imageUrl = await getUnsplashImage(recipeData.title);
@@ -360,6 +367,11 @@ Respond ONLY with valid JSON in this exact format:
   ]);
 
   return { ...recipeData, slug, image_url: imageUrl };
+}
+
+async function generateAndSaveRecipe(prompt, category, servings = 4, dietary = []) {
+  const recipeData = await generateRecipe(prompt, category, servings, dietary);
+  return saveRecipe(recipeData, category);
 }
 
 const SEED_RECIPES = [
@@ -504,10 +516,19 @@ app.get('/admin/refresh-images', async (req, res) => {
 
 app.post('/api/generate-recipe', aiLimiter, async (req, res) => {
   try {
-    const { prompt, category, servings = 4, dietary = [] } = req.body;
+    const { prompt, category, servings = 4, dietary = [], admin_key } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
-    const recipe = await generateAndSaveRecipe(prompt, category, servings, dietary);
-    res.json({ success: true, recipe });
+
+    const isAdmin = admin_key === 'fatswitchdev2026';
+    const recipeData = await generateRecipe(prompt, category, servings, dietary);
+
+    if (isAdmin) {
+      const recipe = await saveRecipe(recipeData, category);
+      return res.json({ success: true, recipe, saved: true });
+    }
+
+    // Public mode — return recipe data only, no DB write
+    res.json({ success: true, recipe: recipeData, saved: false });
   } catch (err) {
     console.error('Recipe generation error:', err);
     res.status(500).json({ error: 'Failed to generate recipe. Please try again.' });

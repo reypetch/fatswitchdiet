@@ -1,0 +1,153 @@
+<%- include('partials/header', { title: 'Your Generated Recipe' }) %>
+
+<style>
+  .preview-actions { display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+  .btn-share { background:var(--green); color:#fff; }
+  .btn-print { background:#555; color:#fff; }
+  .preview-cta { background:linear-gradient(135deg,var(--green-dark),var(--green)); color:#fff; border-radius:var(--radius); padding:2rem; text-align:center; margin-top:2.5rem; }
+  .preview-cta h3 { color:#fff; margin-bottom:0.5rem; }
+  .preview-cta p { color:rgba(255,255,255,0.85); margin-bottom:1.25rem; }
+  #loadingMsg { text-align:center; padding:4rem; color:var(--gray-600); }
+  @media print {
+    nav, footer, .preview-actions, .preview-cta, .ad-slot { display:none !important; }
+    .container { padding:0 !important; }
+  }
+</style>
+
+<div class="container" style="padding-top:2.5rem; padding-bottom:3rem;">
+
+  <div id="loadingMsg">
+    <div style="font-size:2rem; margin-bottom:1rem;">🍽️</div>
+    <p>Loading your recipe…</p>
+  </div>
+
+  <div id="recipeContent" style="display:none;">
+    <nav style="font-size:0.9rem; color:var(--gray-600); margin-bottom:2rem;">
+      <a href="/" style="color:var(--green);">Home</a> &rsaquo;
+      <a href="/generator" style="color:var(--green);">Generator</a> &rsaquo;
+      <span id="navTitle"></span>
+    </nav>
+
+    <div class="preview-actions no-print">
+      <button onclick="shareRecipe()" class="btn btn-share">🔗 Copy Share Link</button>
+      <button onclick="window.print()" class="btn btn-print">🖨️ Print / Save PDF</button>
+      <a href="/generator" class="btn" style="background:var(--gray-200);color:var(--gray-800);">✨ Generate Another</a>
+    </div>
+
+    <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:2rem; margin-bottom:1.5rem;">
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+        <span class="ai-badge">🤖 AI Generated</span>
+        <span style="font-size:0.75rem;background:#fff3cd;color:#856404;padding:3px 10px;border-radius:20px;font-weight:600;">⏳ Temporary — not saved</span>
+      </div>
+      <h1 id="recipeTitle" style="font-size:2.2rem; margin-bottom:0.75rem;"></h1>
+      <p id="recipeDesc" style="font-size:1.1rem; color:var(--gray-600); line-height:1.7;"></p>
+    </div>
+
+    <div class="recipe-meta-bar" id="recipeMeta"></div>
+
+    <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:2rem; margin-bottom:1.5rem;">
+      <h2 style="margin-bottom:1rem; color:var(--green-dark);">🛒 Ingredients</h2>
+      <ul id="ingredientsList" class="ingredients-list" style="list-style:none;"></ul>
+    </div>
+
+    <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:2rem; margin-bottom:1.5rem;">
+      <h2 style="margin-bottom:1rem; color:var(--green-dark);">👨‍🍳 Instructions</h2>
+      <ol id="instructionsList" class="instructions-list"></ol>
+    </div>
+
+    <div id="nutritionCard" style="display:none;" class="nutrition-card mb-3">
+      <h3 style="margin-bottom:1rem; font-size:1.1rem;">📊 Nutrition per Serving</h3>
+      <div id="nutritionRows"></div>
+    </div>
+
+    <div class="preview-cta no-print">
+      <h3>Want more Fat Switch recipes?</h3>
+      <p>Explore 45+ healthy recipes or generate your own with AI — all free.</p>
+      <a href="/" class="btn" style="background:#fff;color:var(--green-dark);font-weight:700;margin-right:0.5rem;">Browse Recipes</a>
+      <a href="/generator" class="btn" style="background:rgba(255,255,255,0.2);color:#fff;border:2px solid rgba(255,255,255,0.6);">✨ Generate Another</a>
+    </div>
+  </div>
+
+  <div id="errorMsg" style="display:none; text-align:center; padding:4rem;">
+    <p style="color:var(--gray-600);">No recipe data found. <a href="/generator" style="color:var(--green);">Generate one here →</a></p>
+  </div>
+
+</div>
+
+<%- include('partials/footer') %>
+
+<% extraScripts = `
+<script>
+(function () {
+  const hash = window.location.hash.slice(1);
+  if (!hash) {
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('errorMsg').style.display = 'block';
+    return;
+  }
+
+  let r;
+  try {
+    r = JSON.parse(decodeURIComponent(escape(atob(hash))));
+  } catch (e) {
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('errorMsg').style.display = 'block';
+    return;
+  }
+
+  document.title = r.title + ' — FatSwitchDiet';
+  document.getElementById('navTitle').textContent = r.title;
+  document.getElementById('recipeTitle').textContent = r.title;
+  document.getElementById('recipeDesc').textContent = r.description || '';
+
+  // Meta bar
+  const meta = [];
+  if (r.prep_time) meta.push('<div class="recipe-meta-item"><div class="value">' + r.prep_time + 'm</div><div class="label">Prep</div></div>');
+  if (r.cook_time) meta.push('<div class="recipe-meta-item"><div class="value">' + r.cook_time + 'm</div><div class="label">Cook</div></div>');
+  if (r.servings)  meta.push('<div class="recipe-meta-item"><div class="value">' + r.servings + '</div><div class="label">Servings</div></div>');
+  if (r.calories)  meta.push('<div class="recipe-meta-item"><div class="value">' + r.calories + '</div><div class="label">Calories</div></div>');
+  if (r.protein)   meta.push('<div class="recipe-meta-item"><div class="value">' + r.protein + 'g</div><div class="label">Protein</div></div>');
+  document.getElementById('recipeMeta').innerHTML = meta.join('');
+
+  // Ingredients
+  const ingList = document.getElementById('ingredientsList');
+  (r.ingredients || []).forEach(function(ing) {
+    const li = document.createElement('li');
+    li.style = 'display:flex;align-items:flex-start;gap:0.5rem;padding:0.6rem 0;border-bottom:1px solid var(--gray-100)';
+    li.innerHTML = '<span style="color:var(--green);flex-shrink:0;">✓</span>' + ing;
+    ingList.appendChild(li);
+  });
+
+  // Instructions
+  const instList = document.getElementById('instructionsList');
+  (r.instructions || []).forEach(function(step) {
+    const li = document.createElement('li');
+    li.textContent = step;
+    instList.appendChild(li);
+  });
+
+  // Nutrition
+  const nutRows = [];
+  if (r.calories) nutRows.push('<div class="nutrition-row"><span>Calories</span><strong>' + r.calories + ' kcal</strong></div>');
+  if (r.protein)  nutRows.push('<div class="nutrition-row"><span>Protein</span><strong>' + r.protein + 'g</strong></div>');
+  if (r.carbs)    nutRows.push('<div class="nutrition-row"><span>Carbohydrates</span><strong>' + r.carbs + 'g</strong></div>');
+  if (r.fat)      nutRows.push('<div class="nutrition-row"><span>Fat</span><strong>' + r.fat + 'g</strong></div>');
+  if (r.fiber)    nutRows.push('<div class="nutrition-row"><span>Fiber</span><strong>' + r.fiber + 'g</strong></div>');
+  if (nutRows.length) {
+    document.getElementById('nutritionRows').innerHTML = nutRows.join('');
+    document.getElementById('nutritionCard').style.display = 'block';
+  }
+
+  document.getElementById('loadingMsg').style.display = 'none';
+  document.getElementById('recipeContent').style.display = 'block';
+})();
+
+function shareRecipe() {
+  navigator.clipboard.writeText(window.location.href).then(function() {
+    const btn = event.target;
+    btn.textContent = '✅ Link copied!';
+    setTimeout(function() { btn.textContent = '🔗 Copy Share Link'; }, 2500);
+  });
+}
+</script>
+`; %>
