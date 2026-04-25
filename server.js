@@ -106,43 +106,38 @@ Requirements:
 
 // ── Homepage ─────────────────────────────────────────────────
 app.get('/', (req, res) => {
-  const categories = db.getCategories();
   const featured   = db.getFeaturedRecipes();
   const recent     = db.getRecentRecipes();
   const total      = db.getTotalCount();
-  res.render('index', { categories, featured, recent, recipes: recent, total, formatDate, page: 'home' });
+  res.render('index', { featured, recent, recipes: recent, total, formatDate });
 });
 
 // ── Generator Page ───────────────────────────────────────────
-app.get('/generator', (req, res) => {
-  const isAdmin   = req.query.admin === ADMIN_KEY;
-  const adminMode = isAdmin; // alias used by older template snippets
-  res.render('generator', { isAdmin, adminMode, categories: db.getCategories(), page: 'generator' });
-});
+app.get('/generator', (req, res) => { res.render('generator'); });
 
 // ── Recipe Page (SSR for SEO) ─────────────────────────────────
 app.get('/recipe/preview', (req, res) => {
-  res.render('recipe-preview', { categories: db.getCategories(), page: 'generator' });
+  res.render('recipe-preview');
 });
 
 app.get('/recipe/:slug', (req, res) => {
   const recipe = db.getRecipe(req.params.slug);
-  if (!recipe) return res.status(404).render('404', { categories: db.getCategories(), page: '404' });
-  res.render('recipe', { recipe, related: [], formatDate, categories: db.getCategories(), page: 'recipe' });
+  if (!recipe) return res.status(404).render('404');
+  res.render('recipe', { recipe, related: [], formatDate });
 });
 
 // ── Category Page ─────────────────────────────────────────────
 app.get('/category/:cat', (req, res) => {
   const cat     = req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1);
   const recipes = db.getByCategory(cat);
-  res.render('category', { recipes, category: cat, formatDate, categories: db.getCategories(), page: 'category' });
+  res.render('category', { recipes, category: cat, formatDate });
 });
 
 // ── Static Pages ──────────────────────────────────────────────
-app.get('/about',          (req, res) => res.render('about',     { categories: db.getCategories(), page: 'about' }));
-app.get('/contact',        (req, res) => res.render('contact',   { categories: db.getCategories(), page: 'contact' }));
-app.get('/privacy-policy', (req, res) => res.render('privacy',   { categories: db.getCategories(), page: 'privacy' }));
-app.get('/diet-plan',      (req, res) => res.render('diet-plan', { categories: db.getCategories(), page: 'diet-plan' }));
+app.get('/about',          (req, res) => res.render('about'));
+app.get('/contact',        (req, res) => res.render('contact'));
+app.get('/privacy-policy', (req, res) => res.render('privacy'));
+app.get('/diet-plan',      (req, res) => res.render('diet-plan'));
 
 // ════════════════════════════════════════════════════════════
 //  API ROUTES
@@ -150,13 +145,12 @@ app.get('/diet-plan',      (req, res) => res.render('diet-plan', { categories: d
 
 // ── POST /api/generate ────────────────────────────────────────
 app.post('/api/generate', async (req, res) => {
-  const { keyword, category, dietary, adminKey } = req.body;
+  const { keyword, cuisine, dietary } = req.body;
+  const isAdmin = req.body.adminKey === ADMIN_KEY;
 
   if (!keyword || keyword.trim().length < 2) {
     return res.status(400).json({ error: 'Please enter a recipe keyword.' });
   }
-
-  const isAdmin = adminKey === ADMIN_KEY;
 
   try {
     const message = await claude.messages.create({
@@ -164,7 +158,7 @@ app.post('/api/generate', async (req, res) => {
       max_tokens: 4096,
       messages: [{
         role:    'user',
-        content: buildPrompt(keyword.trim(), category, dietary)
+        content: buildPrompt(keyword.trim(), cuisine, dietary)
       }]
     });
 
@@ -185,23 +179,15 @@ app.post('/api/generate', async (req, res) => {
       db.saveRecipe({
         slug,
         title:    data.title,
-        category: category || data.category || 'Dinner',
+        category: cuisine || data.category || 'Dinner',
         cuisine:  data.cuisine  || 'International',
         keyword:  keyword.trim(),
         data
       });
-
-      const saved = db.getRecipe(slug);
-      if (!saved) {
-        return res.status(500).json({ error: 'Recipe generated but failed to save. Please try again.' });
-      }
-
-      // Admin: return slug so frontend can redirect to the saved recipe page
-      return res.json({ success: true, slug, title: data.title, savedToDB: true });
     }
 
-    // Public: return recipe data directly (no DB save, no redirect)
-    res.json({ success: true, slug: null, title: data.title, data, savedToDB: false });
+    if (isAdmin) return res.json({ success: true, slug, title: data.title });
+    res.json({ success: true, slug: null, data, savedToDB: false });
 
   } catch (err) {
     console.error('Generate error:', err.message);
@@ -328,7 +314,7 @@ Requirements:
 });
 
 // ── 404 fallback ──────────────────────────────────────────────
-app.use((req, res) => res.status(404).render('404', { categories: db.getCategories(), page: '404' }));
+app.use((req, res) => res.status(404).render('404'));
 
 // ── Start ─────────────────────────────────────────────────────
 app.listen(PORT, () => {

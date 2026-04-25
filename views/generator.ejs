@@ -238,9 +238,7 @@
     <!-- Form -->
     <div id="genForm">
 
-      <% if (isAdmin) { %>
-      <div class="admin-badge">🔑 Admin Mode — recipes will be saved to database</div>
-      <% } %>
+      <div class="admin-badge" id="adminBadge" style="display:none">🔑 Admin Mode — recipes will be saved to database</div>
 
       <label style="display:block;font-family:var(--font-ui);font-size:0.82rem;font-weight:600;color:var(--text);margin-bottom:6px;letter-spacing:0.03em">
         RECIPE NAME OR KEYWORD *
@@ -299,7 +297,7 @@
         <li id="step2">🔄 Finding the best Fat Switch swaps…</li>
         <li id="step3">📊 Calculating nutrition comparison…</li>
         <li id="step4">📝 Writing instructions and tips…</li>
-        <li id="step5" id="step5Admin"><%= isAdmin ? '💾 Saving to database…' : '✅ Finishing up…' %></li>
+        <li id="step5">✅ Finishing up…</li>
       </ul>
     </div>
 
@@ -369,11 +367,12 @@
 // ── Admin mode flag from server ──
 const IS_ADMIN = new URLSearchParams(window.location.search).get('admin') === 'fatswitchdev2026';
 const ADMIN_KEY = IS_ADMIN ? 'fatswitchdev2026' : null;
+if (IS_ADMIN) document.getElementById('adminBadge').style.display = 'inline-flex';
 
 // ── Generate Recipe ──
 async function generateRecipe() {
   const keyword = document.getElementById('genKeyword').value.trim();
-  const category = document.getElementById('genCategory').value;
+  const cuisine = document.getElementById('genCategory').value;
   const dietary = document.getElementById('genDietary').value;
   const errEl   = document.getElementById('genError');
 
@@ -402,14 +401,10 @@ async function generateRecipe() {
   }, 2500);
 
   try {
-    // FIX: Include adminKey in request body if in admin mode
-    const payload = { keyword, category, dietary };
-    if (IS_ADMIN) payload.adminKey = ADMIN_KEY;
-
     const res  = await fetch('/api/generate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload)
+      body:    JSON.stringify({ keyword, cuisine, dietary, ...(IS_ADMIN && {adminKey:'fatswitchdev2026'}) })
     });
     const data = await res.json();
 
@@ -429,16 +424,10 @@ async function generateRecipe() {
 
     document.getElementById('loadingTitle').textContent = '✅ Recipe ready!';
 
-    if (IS_ADMIN && data.savedToDB && data.slug) {
-      // FIX: Admin mode — redirect to the saved recipe page
-      setTimeout(() => {
-        window.location.href = '/recipe/' + data.slug;
-      }, 800);
+    if (IS_ADMIN && data.slug) {
+      window.location.href = '/recipe/' + data.slug;
     } else {
-      // FIX: Public mode — show inline result card
-      setTimeout(() => {
-        showPublicResult(data);
-      }, 600);
+      alert('✅ ' + data.title + ' — Fat Switch generated!');
     }
 
   } catch (err) {
