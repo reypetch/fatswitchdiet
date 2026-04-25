@@ -125,9 +125,9 @@ app.get('/recipe/:slug', (req, res) => {
 
 // ── Category Page ─────────────────────────────────────────────
 app.get('/category/:cat', (req, res) => {
-  const cat = req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1);
+  const cat     = req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1);
   const recipes = db.getByCategory(cat);
-  res.render('category', { recipes, category: cat, formatDate });
+  res.render('category', { recipes, category: cat, formatDate, page: 'category', categories: db.getCategories() });
 });
 
 // ── Static Pages ──────────────────────────────────────────────

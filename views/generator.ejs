@@ -117,7 +117,7 @@ if (form) form.addEventListener('submit', async (e) => {
         ${r.instructions.map(s => `<li style="padding:0.4rem 0;">${s}</li>`).join('')}
       </ol>
       <div style="margin-top:1.5rem;">
-        <a href="/recipe/${r.slug}" class="btn btn-primary">View Full Recipe →</a>
+        ${r.slug ? `<a href="/recipe/${r.slug}" class="btn btn-primary">View Full Recipe →</a>` : ''}
       </div>
     `;
     resultContent.style.display = 'block';
