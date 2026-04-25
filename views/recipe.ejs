@@ -1,392 +1,111 @@
-<%
-  const r = recipe.data;
-  pageTitle    = r.title + ' — FatSwitchDiet';
-  metaDesc     = r.meta_description || r.description;
-  canonicalUrl = '/recipe/' + recipe.slug;
-  const schemaJson = JSON.stringify({
-    "@context": "https://schema.org/",
-    "@type": "Recipe",
-    "name": r.title,
-    "description": r.description,
-    "image": ["https://fatswitchdiet.com/images/" + recipe.slug + ".jpg"],
-    "author": { "@type": "Person", "name": "Alex Rivera" },
-    "datePublished": recipe.created_at ? recipe.created_at.split(' ')[0] : new Date().toISOString().split('T')[0],
-    "prepTime": "PT" + (r.prep_time || 20) + "M",
-    "cookTime": "PT" + (r.cook_time || 30) + "M",
-    "totalTime": "PT" + ((r.prep_time || 20) + (r.cook_time || 30)) + "M",
-    "recipeYield": (r.servings || 4) + " servings",
-    "recipeCategory": r.category || "Dinner",
-    "recipeCuisine": r.cuisine || "International",
-    "nutrition": {
-      "@type": "NutritionInformation",
-      "calories": (r.nutrition && r.nutrition.switched ? r.nutrition.switched.calories : '') + " calories",
-      "proteinContent": (r.nutrition && r.nutrition.switched ? r.nutrition.switched.protein : '') + "g",
-      "carbohydrateContent": (r.nutrition && r.nutrition.switched ? r.nutrition.switched.carbs : '') + "g",
-      "fatContent": (r.nutrition && r.nutrition.switched ? r.nutrition.switched.fat : '') + "g"
-    },
-    "recipeIngredient": r.ingredients ? [...(r.ingredients.main||[]), ...(r.ingredients.filling_or_sauce||[])] : [],
-    "recipeInstructions": (r.instructions||[]).map((s,i) => ({ "@type": "HowToStep", "name": s.title, "text": s.detail })),
-    "aggregateRating": { "@type": "AggregateRating", "ratingValue": "4.8", "ratingCount": "12" }
-  });
-  extraHead = `<script type="application/ld+json">${schemaJson}<\/script>`;
-%>
-<%- include('partials/header') %>
+<%- include('partials/header', { title: recipe.title }) %>
 
-<div class="page-wrap">
-
-  <!-- BREADCRUMB -->
-  <nav class="breadcrumb" aria-label="Breadcrumb">
-    <a href="/">Home</a>
-    <span class="breadcrumb-sep">›</span>
-    <a href="/category/<%= (r.category||'dinner').toLowerCase() %>"><%= r.category || 'Dinner' %></a>
-    <span class="breadcrumb-sep">›</span>
-    <span><%= r.title %></span>
+<div class="container" style="padding-top:2.5rem; padding-bottom:3rem;">
+  <nav style="font-size:0.9rem; color:var(--gray-600); margin-bottom:2rem;">
+    <a href="/" style="color:var(--green);">Home</a> &rsaquo;
+    <% if (recipe.category_name) { %>
+      <a href="/category/<%= recipe.category_slug %>" style="color:var(--green);"><%= recipe.category_name %></a> &rsaquo;
+    <% } %>
+    <%= recipe.title %>
   </nav>
 
   <div class="recipe-layout">
+    <div>
+      <div class="recipe-hero-img">🍽️</div>
 
-    <!-- ══════════ MAIN ══════════ -->
-    <main class="recipe-main">
-
-      <!-- 1. HERO IMAGE + TITLE -->
-      <div class="recipe-hero-img-placeholder fade-up">🍽️</div>
-
-      <div class="fade-up fade-up-1">
-        <div class="recipe-card-meta" style="margin-bottom:12px">
-          <span class="tag tag-category"><%= r.category %></span>
-          <span class="tag tag-category" style="background:var(--forest-mid)"><%= r.cuisine %></span>
-          <% if (r.fat_switch && r.fat_switch.savings_pct) { %>
-          <span class="tag tag-swap">⚡ <%= r.fat_switch.savings_pct %>% less calories</span>
-          <% } %>
+      <div style="margin:1.5rem 0;">
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+          <% if (recipe.category_name) { %><span class="card-category"><%= recipe.category_name %></span><% } %>
+          <% if (recipe.ai_generated) { %><span class="ai-badge">🤖 AI Generated</span><% } %>
         </div>
-
-        <h1><%= r.title %></h1>
-
-        <div class="recipe-meta-bar">
-          <span>📅 <strong><%= formatDate(recipe.created_at) %></strong></span>
-          <span>✍️ By <strong>Alex Rivera</strong></span>
-          <span>⏱ Prep: <strong><%= r.prep_time %> min</strong></span>
-          <span>🔥 Cook: <strong><%= r.cook_time %> min</strong></span>
-          <span>👥 Serves: <strong><%= r.servings %></strong></span>
-          <span>⭐ <strong>4.8</strong></span>
-        </div>
-
-        <p style="font-size:1.05rem;color:var(--text-mid);line-height:1.8"><%= r.description %></p>
+        <h1 style="font-size:2.2rem; margin-bottom:0.75rem;"><%= recipe.title %></h1>
+        <p style="font-size:1.1rem; color:var(--gray-600); line-height:1.7;"><%= recipe.description %></p>
       </div>
 
-      <!-- AD SLOT 1 -->
-      <div class="ad-slot">
-        <span class="ad-slot-label">Advertisement</span>
-        <span class="ad-slot-size">728×90 — Leaderboard</span>
+      <div class="recipe-meta-bar">
+        <% if (recipe.prep_time) { %>
+          <div class="recipe-meta-item"><div class="value"><%= recipe.prep_time %>m</div><div class="label">Prep Time</div></div>
+        <% } %>
+        <% if (recipe.cook_time) { %>
+          <div class="recipe-meta-item"><div class="value"><%= recipe.cook_time %>m</div><div class="label">Cook Time</div></div>
+        <% } %>
+        <div class="recipe-meta-item"><div class="value"><%= recipe.servings || 4 %></div><div class="label">Servings</div></div>
+        <% if (recipe.calories) { %>
+          <div class="recipe-meta-item"><div class="value"><%= recipe.calories %></div><div class="label">Calories</div></div>
+        <% } %>
+        <% if (recipe.protein) { %>
+          <div class="recipe-meta-item"><div class="value"><%= recipe.protein %>g</div><div class="label">Protein</div></div>
+        <% } %>
       </div>
 
-      <!-- 2. FAT SWITCH SCORE -->
-      <% if (r.fat_switch) { %>
-      <div class="fat-switch-score fade-up">
-        <div class="fss-icon">⚡</div>
-        <div class="fss-content">
-          <div class="fss-label">Fat Switch Score</div>
-          <div class="fss-title"><%= r.fat_switch.headline || 'This recipe saves you ' + r.fat_switch.savings_kcal + ' calories' %></div>
-          <div class="fss-bar-wrap">
-            <div class="fss-bar" id="fssBar" style="width:0%"></div>
-          </div>
-          <div class="fss-stats">
-            <span class="fss-stat-original">Original: <%= r.fat_switch.original_kcal %> kcal</span>
-            <span>→</span>
-            <span class="fss-stat-switched">Switched: <%= r.fat_switch.switched_kcal %> kcal</span>
-            <span class="fss-stat-save">↓ <%= r.fat_switch.savings_pct %>% saved</span>
-          </div>
-        </div>
-        <div class="fss-score-circle">
-          <div class="fss-score-num"><%= r.fat_switch.savings_pct %></div>
-          <div class="fss-score-pct">% less</div>
-        </div>
-      </div>
-      <% } %>
-
-      <!-- 3. WHY YOU'LL LOVE THIS -->
-      <% if (r.why_love && r.why_love.length) { %>
-      <div class="content-section fade-up">
-        <div class="section-header">
-          <span class="section-icon">❤️</span>
-          <h2>Why You'll Love This</h2>
-        </div>
-        <ul class="pro-tips-list">
-          <% r.why_love.forEach(function(item) { %>
-          <li>
-            <span class="tip-icon"><%= item.icon || '✅' %></span>
-            <span><strong><%= item.title %></strong> — <%= item.detail %></span>
-          </li>
+      <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:2rem; margin-bottom:1.5rem;">
+        <h2 style="margin-bottom:1rem; color:var(--green-dark);">🛒 Ingredients</h2>
+        <ul class="ingredients-list" style="list-style:none;">
+          <% recipe.ingredients.forEach(ing => { %>
+            <li style="display:flex; align-items:flex-start; gap:0.5rem; padding:0.6rem 0; border-bottom:1px solid var(--gray-100);">
+              <span style="color:var(--green); flex-shrink:0;">✓</span>
+              <%= ing %>
+            </li>
           <% }) %>
         </ul>
       </div>
-      <% } %>
 
-      <!-- 4. THE FAT SWITCH -->
-      <% if (r.fat_switch && r.fat_switch.swaps && r.fat_switch.swaps.length) { %>
-      <div class="content-section fade-up">
-        <div class="section-header">
-          <span class="section-icon">🔄</span>
-          <h2>The Fat Switch — Original vs. Swapped</h2>
-        </div>
-        <div class="swap-table-wrap">
-          <table class="swap-table">
-            <thead>
-              <tr>
-                <th>❌ Original Ingredient</th>
-                <th>→ THE SWITCH</th>
-                <th>✅ Healthier Swap & Why</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% r.fat_switch.swaps.forEach(function(swap) { %>
-              <tr>
-                <td><%= swap.original %></td>
-                <td class="swap-arrow">→</td>
-                <td><strong><%= swap.switched %></strong><br><span style="font-size:0.83rem;color:var(--text-light)"><%= swap.reason %></span></td>
-              </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <% } %>
-
-      <!-- 5. INGREDIENTS -->
-      <% if (r.ingredients) { %>
-      <div class="content-section fade-up">
-        <div class="section-header">
-          <span class="section-icon">📋</span>
-          <h2>Ingredients</h2>
-        </div>
-        <% if (r.ingredients.main && r.ingredients.main.length) { %>
-        <p style="font-family:var(--font-ui);font-size:0.82rem;color:var(--text-light);margin-bottom:8px">MAIN INGREDIENTS</p>
-        <div class="ingredients-grid">
-          <% r.ingredients.main.forEach(function(item) { %>
-          <div class="ingredient-item"><%= item %></div>
+      <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:2rem;">
+        <h2 style="margin-bottom:1rem; color:var(--green-dark);">👨‍🍳 Instructions</h2>
+        <ol class="instructions-list">
+          <% recipe.instructions.forEach(step => { %>
+            <li><%= step %></li>
           <% }) %>
-        </div>
-        <% } %>
-        <% if (r.ingredients.filling_or_sauce && r.ingredients.filling_or_sauce.length) { %>
-        <p style="font-family:var(--font-ui);font-size:0.82rem;color:var(--text-light);margin-top:20px;margin-bottom:8px">FILLING / SAUCE</p>
-        <div class="ingredients-grid">
-          <% r.ingredients.filling_or_sauce.forEach(function(item) { %>
-          <div class="ingredient-item"><%= item %></div>
-          <% }) %>
-        </div>
-        <% } %>
-        <p style="font-size:0.82rem;color:var(--amber);font-family:var(--font-ui);margin-top:12px">⚡ = Fat Switch ingredient</p>
+        </ol>
+      </div>
+    </div>
+
+    <div>
+      <% if (recipe.calories || recipe.protein || recipe.carbs || recipe.fat) { %>
+      <div class="nutrition-card mb-3">
+        <h3 style="margin-bottom:1rem; font-size:1.1rem;">📊 Nutrition per Serving</h3>
+        <% if (recipe.calories) { %><div class="nutrition-row"><span>Calories</span><strong><%= recipe.calories %> kcal</strong></div><% } %>
+        <% if (recipe.protein) { %><div class="nutrition-row"><span>Protein</span><strong><%= recipe.protein %>g</strong></div><% } %>
+        <% if (recipe.carbs) { %><div class="nutrition-row"><span>Carbohydrates</span><strong><%= recipe.carbs %>g</strong></div><% } %>
+        <% if (recipe.fat) { %><div class="nutrition-row"><span>Fat</span><strong><%= recipe.fat %>g</strong></div><% } %>
+        <% if (recipe.fiber) { %><div class="nutrition-row"><span>Fiber</span><strong><%= recipe.fiber %>g</strong></div><% } %>
       </div>
       <% } %>
 
-      <!-- 6. INSTRUCTIONS -->
-      <% if (r.instructions && r.instructions.length) { %>
-      <div class="content-section fade-up">
-        <div class="section-header">
-          <span class="section-icon">👨‍🍳</span>
-          <h2>Step-by-Step Instructions</h2>
-        </div>
-        <% r.instructions.forEach(function(step, i) { %>
-        <div class="instruction-step">
-          <div class="step-num"><%= i + 1 %></div>
-          <div class="step-content">
-            <strong><%= step.title %></strong>
-            <%= step.detail %>
-          </div>
-        </div>
-        <% }) %>
-      </div>
-      <% } %>
-
-      <!-- AD SLOT 2 -->
-      <div class="ad-slot">
-        <span class="ad-slot-label">Advertisement</span>
-        <span class="ad-slot-size">300×250 — Medium Rectangle</span>
-      </div>
-
-      <!-- 7. NUTRITION COMPARISON -->
-      <% if (r.nutrition && r.nutrition.original && r.nutrition.switched) { %>
-      <div class="content-section fade-up">
-        <div class="section-header">
-          <span class="section-icon">📊</span>
-          <h2>Nutrition Comparison (Per Serving)</h2>
-        </div>
-        <div class="nutrition-compare">
-          <div class="nutrition-card original">
-            <div class="nutrition-card-label">❌ Original Recipe</div>
-            <div class="nutrition-row"><span>Calories</span><span class="nutrition-value"><%= r.nutrition.original.calories %> kcal</span></div>
-            <div class="nutrition-row"><span>Protein</span><span class="nutrition-value"><%= r.nutrition.original.protein %>g</span></div>
-            <div class="nutrition-row"><span>Carbs</span><span class="nutrition-value"><%= r.nutrition.original.carbs %>g</span></div>
-            <div class="nutrition-row"><span>Fat</span><span class="nutrition-value"><%= r.nutrition.original.fat %>g</span></div>
-            <div class="nutrition-row"><span>Saturated Fat</span><span class="nutrition-value"><%= r.nutrition.original.sat_fat %>g</span></div>
-          </div>
-          <div class="nutrition-card switched">
-            <div class="nutrition-card-label">✅ Fat Switched Recipe</div>
-            <div class="nutrition-row"><span>Calories</span><span class="nutrition-value" style="color:#155724"><%= r.nutrition.switched.calories %> kcal</span></div>
-            <div class="nutrition-row"><span>Protein</span><span class="nutrition-value" style="color:#155724"><%= r.nutrition.switched.protein %>g</span></div>
-            <div class="nutrition-row"><span>Carbs</span><span class="nutrition-value"><%= r.nutrition.switched.carbs %>g</span></div>
-            <div class="nutrition-row"><span>Fat</span><span class="nutrition-value" style="color:#155724"><%= r.nutrition.switched.fat %>g</span></div>
-            <div class="nutrition-row"><span>Saturated Fat</span><span class="nutrition-value" style="color:#155724"><%= r.nutrition.switched.sat_fat %>g</span></div>
-          </div>
-          <div class="nutrition-save">🎉 You save <%= r.fat_switch ? r.fat_switch.savings_kcal : '' %> calories · Higher protein · Less saturated fat per serving</div>
+      <% if (recipe.tags && recipe.tags.length > 0) { %>
+      <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.5rem; margin-bottom:1.5rem;">
+        <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">🏷️ Tags</h3>
+        <div class="tags">
+          <% recipe.tags.forEach(tag => { %><span class="tag">#<%= tag %></span><% }) %>
         </div>
       </div>
       <% } %>
 
-      <!-- 8. PRO TIPS -->
-      <% if (r.pro_tips && r.pro_tips.length) { %>
-      <div class="content-section fade-up">
-        <div class="section-header">
-          <span class="section-icon">💡</span>
-          <h2>Pro Tips for Perfect Results</h2>
-        </div>
-        <ul class="pro-tips-list">
-          <% r.pro_tips.forEach(function(tip) { %>
-          <li>
-            <span class="tip-icon"><%= tip.icon || '💡' %></span>
-            <span><strong><%= tip.title %></strong> — <%= tip.detail %></span>
-          </li>
-          <% }) %>
-        </ul>
+      <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.5rem; text-align:center;">
+        <div style="font-size:2.5rem; margin-bottom:0.75rem;">✨</div>
+        <h3 style="margin-bottom:0.5rem;">Want more like this?</h3>
+        <p style="color:var(--gray-600); font-size:0.9rem; margin-bottom:1rem;">Generate a custom recipe with AI</p>
+        <a href="/generator" class="btn btn-primary" style="width:100%; justify-content:center;">AI Generator</a>
       </div>
-      <% } %>
-
-      <!-- 9. ORIGIN STORY -->
-      <% if (r.origin) { %>
-      <div class="content-section fade-up">
-        <div class="section-header">
-          <span class="section-icon">🌍</span>
-          <h2>The Origin Story</h2>
-        </div>
-        <% r.origin.split('\n').filter(p => p.trim()).forEach(function(para) { %>
-        <p><%= para %></p>
-        <% }) %>
-      </div>
-      <% } %>
-
-      <!-- AD SLOT 3 -->
-      <div class="ad-slot">
-        <span class="ad-slot-label">Advertisement</span>
-        <span class="ad-slot-size">728×90 — Leaderboard</span>
-      </div>
-
-      <!-- 10. FAQ -->
-      <% if (r.faq && r.faq.length) { %>
-      <div class="content-section fade-up">
-        <div class="section-header">
-          <span class="section-icon">❓</span>
-          <h2>Frequently Asked Questions</h2>
-        </div>
-        <div class="faq-list">
-          <% r.faq.forEach(function(item, i) { %>
-          <div class="faq-item">
-            <button class="faq-question" onclick="toggleFaq(this)">
-              <%= item.q %>
-              <span class="faq-icon">+</span>
-            </button>
-            <div class="faq-answer">
-              <div class="faq-answer-inner"><%= item.a %></div>
-            </div>
-          </div>
-          <% }) %>
-        </div>
-      </div>
-      <% } %>
-
-      <!-- 11. RELATED RECIPES -->
-      <div id="relatedSection" style="margin:40px 0">
-        <h2 style="margin-bottom:8px">You Might Also Love</h2>
-        <p style="color:var(--text-light);font-size:0.9rem;margin-bottom:20px">More Fat Switch recipes you'll want to try</p>
-        <div id="relatedGrid" class="related-grid">
-          <p style="color:var(--text-light);font-size:0.9rem">Loading…</p>
-        </div>
-      </div>
-
-    </main>
-
-    <!-- ══════════ SIDEBAR ══════════ -->
-    <aside class="recipe-sidebar">
-
-      <div class="ad-slot" style="min-height:250px;margin-bottom:24px">
-        <span class="ad-slot-label">Advertisement</span>
-        <span class="ad-slot-size">300×250</span>
-      </div>
-
-      <!-- Quick Summary -->
-      <div class="sidebar-widget">
-        <h3>⚡ Quick Summary</h3>
-        <div style="font-family:var(--font-ui);font-size:0.88rem">
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-light)">Prep Time</span><strong><%= r.prep_time %> min</strong></div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-light)">Cook Time</span><strong><%= r.cook_time %> min</strong></div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-light)">Servings</span><strong><%= r.servings %></strong></div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-light)">Difficulty</span><strong><%= r.difficulty %></strong></div>
-          <% if (r.fat_switch) { %>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text-light)">Original kcal</span><strong style="color:var(--red)"><%= r.fat_switch.original_kcal %></strong></div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0"><span style="color:var(--text-light)">Switched kcal</span><strong style="color:#155724"><%= r.fat_switch.switched_kcal %> ✅</strong></div>
-          <% } %>
-        </div>
-      </div>
-
-      <!-- Generate CTA -->
-      <div class="sidebar-widget" style="background:var(--forest);border-color:var(--forest)">
-        <h3 style="color:var(--cream)">⚡ Try the Generator</h3>
-        <p style="font-size:0.85rem;color:rgba(250,247,240,0.7);margin-bottom:16px">Type any recipe name and get a full Fat Switch recipe in seconds.</p>
-        <a href="/generator" class="btn btn-primary" style="width:100%;justify-content:center;font-size:0.85rem">Generate a Recipe →</a>
-      </div>
-
-      <div class="ad-slot" style="min-height:250px">
-        <span class="ad-slot-label">Advertisement</span>
-        <span class="ad-slot-size">300×600</span>
-      </div>
-
-    </aside>
-
+    </div>
   </div>
-</div>
 
-<script>
-  function toggleFaq(btn) {
-    btn.closest('.faq-item').classList.toggle('open');
-  }
-
-  window.addEventListener('load', function() {
-    setTimeout(() => {
-      const bar = document.getElementById('fssBar');
-      if (bar) bar.style.width = '<%= r.fat_switch ? r.fat_switch.savings_pct : 40 %>%';
-    }, 600);
-  });
-
-  // Load related recipes
-  (async function() {
-    try {
-      const res  = await fetch('/api/recipes');
-      const data = await res.json();
-      const others = data.filter(r => r.slug !== '<%= recipe.slug %>').slice(0, 3);
-      const grid = document.getElementById('relatedGrid');
-      if (!others.length) {
-        grid.innerHTML = `<a href="/generator" class="btn btn-outline">⚡ Generate Another Recipe</a>`;
-        return;
-      }
-      const emojiMap = {Japanese:'🍱',Korean:'🥢',Thai:'🍜',Italian:'🍝',Chinese:'🥟',Indian:'🍛',Mexican:'🌮',French:'🥐',American:'🍔'};
-      grid.innerHTML = others.map(r => `
-        <a href="/recipe/${r.slug}" style="text-decoration:none">
-          <div class="recipe-card">
-            <div class="recipe-card-img-placeholder">${emojiMap[r.cuisine]||'🍽️'}</div>
-            <div class="recipe-card-body">
-              <div class="recipe-card-meta">
-                <span class="tag tag-category">${r.category}</span>
-                ${r.savings_pct ? `<span class="tag tag-swap">⚡ Switched</span>` : ''}
-              </div>
-              <div class="recipe-card-title">${r.title}</div>
-              <div class="recipe-card-stats">
-                ${r.kcal ? `<span>✅ ${r.kcal} kcal</span>` : ''}
-              </div>
-            </div>
+  <% if (related.length > 0) { %>
+  <div style="margin-top:3rem;">
+    <h2 style="margin-bottom:1.5rem; color:var(--green-dark);">You Might Also Like</h2>
+    <div class="grid grid-3">
+      <% related.forEach(r => { %>
+        <div class="card">
+          <div class="card-img-placeholder" style="height:160px; font-size:3rem;">🥗</div>
+          <div class="card-body">
+            <h3 class="card-title"><a href="/recipe/<%= r.slug %>"><%= r.title %></a></h3>
+            <p class="card-desc"><%= r.description %></p>
           </div>
-        </a>
-      `).join('');
-    } catch(e) { console.error(e); }
-  })();
-</script>
+        </div>
+      <% }) %>
+    </div>
+  </div>
+  <% } %>
+</div>
 
 <%- include('partials/footer') %>

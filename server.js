@@ -119,8 +119,8 @@ app.get('/generator', (req, res) => {
 // ── Recipe Page (SSR for SEO) ─────────────────────────────────
 app.get('/recipe/:slug', (req, res) => {
   const recipe = db.getRecipe(req.params.slug);
-  if (!recipe) return res.status(404).render('404');
-  res.render('recipe', { recipe, formatDate });
+  if (!recipe) return res.status(404).render('404', { page: '404', categories: db.getCategories() });
+  res.render('recipe', { recipe, formatDate, page: 'recipe', categories: db.getCategories() });
 });
 
 // ── Category Page ─────────────────────────────────────────────
@@ -131,10 +131,10 @@ app.get('/category/:cat', (req, res) => {
 });
 
 // ── Static Pages ──────────────────────────────────────────────
-app.get('/about',          (req, res) => res.render('about'));
-app.get('/contact',        (req, res) => res.render('contact'));
-app.get('/privacy-policy', (req, res) => res.render('privacy'));
-app.get('/diet-plan',      (req, res) => res.render('diet-plan'));
+app.get('/about',          (req, res) => res.render('about',      { page: 'about',      categories: db.getCategories() }));
+app.get('/contact',        (req, res) => res.render('contact',    { page: 'contact',    categories: db.getCategories() }));
+app.get('/privacy-policy', (req, res) => res.render('privacy',    { page: 'privacy',    categories: db.getCategories() }));
+app.get('/diet-plan',      (req, res) => res.render('diet-plan',  { page: 'diet-plan',  categories: db.getCategories() }));
 
 // ════════════════════════════════════════════════════════════
 //  API ROUTES
@@ -374,7 +374,7 @@ Requirements:
 });
 
 // ── 404 fallback ──────────────────────────────────────────────
-app.use((req, res) => res.status(404).render('404'));
+app.use((req, res) => res.status(404).render('404', { page: '404', categories: db.getCategories() }));
 
 // ── Start ─────────────────────────────────────────────────────
 app.listen(PORT, () => {
