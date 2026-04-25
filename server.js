@@ -140,6 +140,69 @@ app.get('/diet-plan',      (req, res) => res.render('diet-plan'));
 //  API ROUTES
 // ════════════════════════════════════════════════════════════
 
+// ── POST /api/generate-recipe (used by restored generator.ejs) ───────────────
+app.post('/api/generate-recipe', async (req, res) => {
+  const { prompt, category, servings, dietary, adminKey } = req.body;
+  const isAdmin = adminKey === 'fatswitchdev2026';
+
+  if (!prompt || prompt.trim().length < 2) {
+    return res.status(400).json({ error: 'Please describe what you would like to eat.' });
+  }
+
+  const dietaryStr = Array.isArray(dietary) ? dietary.join(', ') : (dietary || '');
+
+  try {
+    const message = await claude.messages.create({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: buildPrompt(prompt.trim(), category, dietaryStr) }]
+    });
+
+    const raw   = message.content[0].text.trim();
+    const clean = raw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const data  = JSON.parse(clean);
+
+    if (!data.title || !data.ingredients || !data.instructions) {
+      throw new Error('Incomplete recipe data returned.');
+    }
+
+    // Flatten ingredients from rich { main, filling_or_sauce } to string array
+    const ingredients = [
+      ...(Array.isArray(data.ingredients) ? data.ingredients : []),
+      ...(Array.isArray(data.ingredients?.main) ? data.ingredients.main : []),
+      ...(Array.isArray(data.ingredients?.filling_or_sauce) ? data.ingredients.filling_or_sauce : []),
+    ];
+
+    // Flatten instructions from [{ title, detail }] or [string] to string array
+    const instructions = (Array.isArray(data.instructions) ? data.instructions : []).map(s =>
+      typeof s === 'string' ? s : `${s.title}: ${s.detail}`
+    );
+
+    const slug = makeSlug(data.title);
+
+    if (isAdmin) {
+      db.saveRecipe({
+        slug,
+        title:    data.title,
+        category: category || data.category || 'Dinner',
+        cuisine:  data.cuisine  || 'International',
+        keyword:  prompt.trim(),
+        data
+      });
+      return res.json({ success: true, recipe: { ...data, slug, ingredients, instructions } });
+    }
+
+    res.json({ success: true, recipe: { ...data, slug: null, ingredients, instructions } });
+
+  } catch (err) {
+    console.error('Generate-recipe error:', err.message);
+    if (err instanceof SyntaxError) {
+      return res.status(500).json({ error: 'AI returned unexpected format. Please try again.' });
+    }
+    res.status(500).json({ error: 'Generation failed. Please try again in a moment.' });
+  }
+});
+
 // ── POST /api/generate ────────────────────────────────────────
 app.post('/api/generate', async (req, res) => {
   const { keyword, cuisine, dietary } = req.body;
