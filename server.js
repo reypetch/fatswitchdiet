@@ -1,608 +1,334 @@
 require('dotenv').config();
-const express = require('express');
-const path = require('path');
-const rateLimit = require('express-rate-limit');
+const express  = require('express');
+const path     = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
-const slugify = require('slugify');
-const db = require('./db/database');
-const { getUnsplashImage } = require('./utils/images');
+const slugify  = require('slugify');
+const db       = require('./db/database');
 
-// Ensure image_url column exists (safe migration)
-try { db.run('ALTER TABLE recipes ADD COLUMN image_url TEXT'); } catch (_) {}
-
-
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// Let the SDK read ANTHROPIC_API_KEY from env directly (avoids passing undefined)
-const anthropic = new Anthropic();
+const ADMIN_KEY = 'fatswitchdev2026';
 
-const apiKeyPreview = process.env.ANTHROPIC_API_KEY
-  ? process.env.ANTHROPIC_API_KEY.slice(0, 10) + '...'
-  : 'NOT SET';
-console.log(`[startup] ANTHROPIC_API_KEY: ${apiKeyPreview}`);
-
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-app.use(express.static(path.join(__dirname, 'public')));
+// ── Middleware ───────────────────────────────────────────────
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'ejs');
 
-const aiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { error: 'Too many AI requests. Please try again later.' },
-});
+// ── Claude Client ────────────────────────────────────────────
+const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-function getCategories() {
-  return db.prepare('SELECT * FROM categories ORDER BY name').all();
+// ── Helper ───────────────────────────────────────────────────
+function makeSlug(title) {
+  return slugify(title, { lower: true, strict: true, trim: true });
 }
 
-function parseRecipe(recipe) {
-  if (!recipe) return null;
-  return {
-    ...recipe,
-    ingredients: JSON.parse(recipe.ingredients || '[]'),
-    instructions: JSON.parse(recipe.instructions || '[]'),
-    tags: JSON.parse(recipe.tags || '[]'),
-  };
-}
-
-// ─── Pages ─────────────────────────────────────────────────────────────────
-
-app.get('/', (req, res) => {
-  const featured = db.prepare(`
-    SELECT r.*, c.name as category_name, c.slug as category_slug
-    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
-    WHERE r.featured = 1 ORDER BY r.created_at DESC LIMIT 6
-  `).all().map(parseRecipe);
-
-  const recent = db.prepare(`
-    SELECT r.*, c.name as category_name, c.slug as category_slug
-    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
-    ORDER BY r.created_at DESC LIMIT 8
-  `).all().map(parseRecipe);
-
-  res.render('index', { featured, recent, categories: getCategories(), page: 'home' });
-});
-
-app.get('/recipe/preview', (req, res) => {
-  res.render('recipe-preview', { categories: getCategories(), page: 'generator' });
-});
-
-app.get('/recipe/:slug', (req, res) => {
-  const recipe = db.prepare(`
-    SELECT r.*, c.name as category_name, c.slug as category_slug
-    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
-    WHERE r.slug = ?
-  `).get(req.params.slug);
-
-  if (!recipe) return res.status(404).render('404', { categories: getCategories(), page: '404' });
-
-  const related = db.prepare(`
-    SELECT r.*, c.name as category_name FROM recipes r
-    LEFT JOIN categories c ON r.category_id = c.id
-    WHERE r.category_id = ? AND r.id != ? LIMIT 3
-  `).all(recipe.category_id, recipe.id).map(parseRecipe);
-
-  res.render('recipe', { recipe: parseRecipe(recipe), related, categories: getCategories(), page: 'recipe' });
-});
-
-app.get('/category/:slug', (req, res) => {
-  const category = db.prepare('SELECT * FROM categories WHERE slug = ?').get(req.params.slug);
-  if (!category) return res.status(404).render('404', { categories: getCategories(), page: '404' });
-
-  const recipes = db.prepare(`
-    SELECT r.*, c.name as category_name, c.slug as category_slug
-    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
-    WHERE r.category_id = ? ORDER BY r.created_at DESC
-  `).all(category.id).map(parseRecipe);
-
-  res.render('category', { category, recipes, categories: getCategories(), page: 'category' });
-});
-
-app.get('/generator', (req, res) => {
-  const adminMode = req.query.admin === 'fatswitchdev2026';
-  console.log(`[generator] adminMode=${adminMode} (query.admin=${req.query.admin || 'none'})`);
-  res.render('generator', { categories: getCategories(), page: 'generator', adminMode });
-});
-
-app.get('/diet-plan', (req, res) => {
-  const plans = db.prepare('SELECT * FROM diet_plans ORDER BY created_at DESC LIMIT 6').all();
-  res.render('diet-plan', { plans, categories: getCategories(), page: 'diet-plan' });
-});
-
-app.get('/about', (req, res) => res.render('about', { categories: getCategories(), page: 'about' }));
-app.get('/contact', (req, res) => res.render('contact', { categories: getCategories(), page: 'contact' }));
-app.get('/privacy', (req, res) => res.render('privacy', { categories: getCategories(), page: 'privacy' }));
-
-app.get('/healthz', (req, res) => res.json({ status: 'ok' }));
-
-app.get('/google3e9b317ccdb7eb55.html', (req, res) => {
-  res.type('text/html').send('google-site-verification: google3e9b317ccdb7eb55.html');
-});
-
-app.get('/admin/db-status', (req, res) => {
-  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
-  const total = db.prepare('SELECT COUNT(*) as n FROM recipes').get().n;
-  const withImages = db.prepare("SELECT COUNT(*) as n FROM recipes WHERE image_url IS NOT NULL AND image_url != ''").get().n;
-  const sample = db.prepare("SELECT title, image_url FROM recipes ORDER BY id LIMIT 3").all();
-  res.json({
-    total_recipes: total,
-    with_images: withImages,
-    without_images: total - withImages,
-    sample,
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric'
   });
-});
-
-app.get('/admin/recipes', (req, res) => {
-  if (req.query.key !== 'fatswitchdev2026') return res.status(403).send('Forbidden');
-  const recipes = db.prepare(`
-    SELECT r.id, r.title, r.slug, r.created_at, r.image_url, c.name as category
-    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
-    ORDER BY r.id DESC
-  `).all();
-
-  const key = req.query.key;
-  const esc = (s) => (s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
-  const rows = recipes.map((r) => `
-    <tr id="row-${r.id}">
-      <td style="font-size:0.8rem;color:#666">${r.id}</td>
-      <td>
-        ${r.image_url
-          ? `<img src="${esc(r.image_url)}" id="thumb-${r.id}" style="width:50px;height:50px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;">`
-          : `<span id="thumb-${r.id}" style="display:inline-block;width:50px;height:50px;background:#eee;border-radius:4px;vertical-align:middle;margin-right:6px;line-height:50px;text-align:center;">✗</span>`}
-        <a href="/recipe/${esc(r.slug)}" target="_blank">${esc(r.title)}</a>
-      </td>
-      <td>${esc(r.category || '—')}</td>
-      <td>${(r.created_at || '').slice(0, 16)}</td>
-      <td style="white-space:nowrap">
-        <button onclick="toggleReplace(${r.id})" style="background:#2d6a4f;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;margin-right:4px;">📷 Replace</button>
-        <form method="POST" action="/admin/recipes/${r.id}/delete?key=${key}" style="display:inline" onsubmit="return confirm('Delete ${esc(r.title)}?')">
-          <button type="submit" style="background:#e53e3e;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">Delete</button>
-        </form>
-      </td>
-    </tr>
-    <tr id="replace-row-${r.id}" style="display:none;background:#f0fdf4;">
-      <td></td>
-      <td colspan="3" style="padding:12px 14px;">
-        <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
-          <input id="url-${r.id}" type="text" placeholder="Paste image URL..." style="flex:1;min-width:260px;padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.9rem;">
-          <button onclick="previewImage(${r.id})" style="background:#555;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">Preview</button>
-          <button onclick="saveImage(${r.id},'${key}')" style="background:#2d6a4f;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">Save</button>
-          <button onclick="toggleReplace(${r.id})" style="background:#999;color:#fff;border:none;padding:6px 10px;border-radius:4px;cursor:pointer;">Cancel</button>
-        </div>
-        <div id="preview-${r.id}" style="margin-top:10px;display:none;">
-          <img id="preview-img-${r.id}" src="" style="max-height:120px;max-width:320px;border-radius:6px;border:2px solid #2d6a4f;">
-          <span id="preview-err-${r.id}" style="color:#e53e3e;font-size:0.85rem;display:none;">Failed to load image.</span>
-        </div>
-      </td>
-      <td></td>
-    </tr>`).join('');
-
-  res.send(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Admin – Recipes</title>
-<style>
-  body{font-family:sans-serif;padding:2rem;background:#f7f7f7}
-  h1{margin-bottom:1rem}
-  .actions{margin-bottom:1rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
-  table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1)}
-  th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #eee;font-size:0.9rem;vertical-align:middle}
-  th{background:#2d6a4f;color:#fff}
-  tr:last-child td{border-bottom:none}
-  a{color:#2d6a4f}
-</style></head>
-<body>
-<h1>Recipes (${recipes.length})</h1>
-<div class="actions">
-  <a href="/admin/db-status?key=${key}">DB Status</a>
-  <a href="/admin/dedupe?key=${key}" onclick="return confirm('Remove all duplicates?')">Run Dedupe</a>
-  <a href="/admin/refresh-images?key=${key}" target="_blank">Refresh All Images</a>
-  <a href="/admin/run-seed?key=${key}" target="_blank">Run Seed</a>
-</div>
-<table>
-  <thead><tr><th>ID</th><th>Title &amp; Image</th><th>Category</th><th>Created</th><th>Actions</th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<script>
-function toggleReplace(id) {
-  const row = document.getElementById('replace-row-' + id);
-  const visible = row.style.display !== 'none';
-  row.style.display = visible ? 'none' : 'table-row';
-  if (!visible) document.getElementById('url-' + id).focus();
 }
 
-function previewImage(id) {
-  const url = document.getElementById('url-' + id).value.trim();
-  const box = document.getElementById('preview-' + id);
-  const img = document.getElementById('preview-img-' + id);
-  const err = document.getElementById('preview-err-' + id);
-  if (!url) return;
-  box.style.display = 'block';
-  err.style.display = 'none';
-  img.style.display = 'block';
-  img.src = url;
-  img.onerror = () => { img.style.display = 'none'; err.style.display = 'inline'; };
-}
+// ── CLAUDE PROMPT ────────────────────────────────────────────
+function buildPrompt(keyword, cuisine, dietary) {
+  return `You are a professional nutritionist and recipe developer for FatSwitchDiet.com.
+Your specialty is creating indulgent international recipes alongside a "Fat Switch" — smart ingredient swaps that cut 30–45% of calories while preserving full flavor.
 
-async function saveImage(id, key) {
-  const url = document.getElementById('url-' + id).value.trim();
-  if (!url) return alert('Paste a URL first.');
-  const res = await fetch('/admin/recipes/' + id + '/image?key=' + key, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image_url: url }),
-  });
-  if (!res.ok) return alert('Save failed.');
-  // Update thumbnail in-place
-  const thumb = document.getElementById('thumb-' + id);
-  if (thumb.tagName === 'IMG') {
-    thumb.src = url;
-  } else {
-    const img = document.createElement('img');
-    img.id = 'thumb-' + id;
-    img.src = url;
-    img.style = 'width:50px;height:50px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;';
-    thumb.replaceWith(img);
-  }
-  document.getElementById('replace-row-' + id).style.display = 'none';
-}
-</script>
-</body></html>`);
-});
+Generate a complete recipe for: "${keyword}"
+Cuisine preference: ${cuisine || 'Any international cuisine'}
+Dietary note: ${dietary || 'None'}
 
-app.post('/admin/recipes/:id/delete', (req, res) => {
-  if (req.query.key !== 'fatswitchdev2026') return res.status(403).send('Forbidden');
-  db.prepare('DELETE FROM recipes WHERE id = ?').run([req.params.id]);
-  res.redirect(`/admin/recipes?key=${req.query.key}`);
-});
+Return ONLY valid JSON. No markdown. No backticks. No preamble. Exact structure below:
 
-app.post('/admin/recipes/:id/image', (req, res) => {
-  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
-  const { image_url } = req.body;
-  if (!image_url) return res.status(400).json({ error: 'image_url required' });
-  db.prepare('UPDATE recipes SET image_url = ? WHERE id = ?').run([image_url, req.params.id]);
-  res.json({ ok: true });
-});
-
-app.get('/admin/dedupe', (req, res) => {
-  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
-
-  // Find duplicate titles (case-insensitive), keep the highest id (latest), delete the rest
-  const dupes = db.prepare(`
-    SELECT id, title FROM recipes
-    WHERE LOWER(title) IN (
-      SELECT LOWER(title) FROM recipes GROUP BY LOWER(title) HAVING COUNT(*) > 1
-    )
-    AND id NOT IN (
-      SELECT MAX(id) FROM recipes GROUP BY LOWER(title)
-    )
-  `).all();
-
-  if (dupes.length === 0) {
-    return res.json({ removed: 0, message: 'No duplicates found.' });
-  }
-
-  const ids = dupes.map((r) => r.id);
-  db.prepare(`DELETE FROM recipes WHERE id IN (${ids.map(() => '?').join(',')})`).run(ids);
-
-  res.json({
-    removed: dupes.length,
-    titles: dupes.map((r) => r.title),
-  });
-});
-
-app.get('/sitemap.xml', (req, res) => {
-  const base = `${req.protocol}://${req.get('host')}`;
-  const recipes = db.prepare('SELECT slug, created_at FROM recipes ORDER BY created_at DESC').all();
-
-  const urls = recipes.map((r) => {
-    const lastmod = r.created_at ? r.created_at.split(' ')[0].split('T')[0] : new Date().toISOString().split('T')[0];
-    return `  <url>
-    <loc>${base}/recipe/${r.slug}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <priority>0.8</priority>
-  </url>`;
-  }).join('\n');
-
-  res.set('Content-Type', 'application/xml');
-  res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls}
-</urlset>`);
-});
-
-// ─── AI API Endpoints ───────────────────────────────────────────────────────
-
-async function generateRecipe(prompt, category, servings = 4, dietary = []) {
-  const dietaryStr = dietary.length ? `Dietary requirements: ${dietary.join(', ')}.` : '';
-  const userPrompt = `Create a detailed ${category || 'healthy'} recipe for: "${prompt}"
-Servings: ${servings}. ${dietaryStr}
-
-Respond ONLY with valid JSON in this exact format:
 {
-  "title": "Recipe Title",
-  "description": "2-3 sentence description",
-  "prep_time": 10,
-  "cook_time": 20,
-  "servings": ${servings},
-  "calories": 350,
-  "protein": 28,
-  "carbs": 30,
-  "fat": 12,
-  "fiber": 6,
-  "ingredients": ["ingredient 1 with amount", "ingredient 2 with amount"],
-  "instructions": ["Step 1 description", "Step 2 description"],
-  "tags": ["tag1", "tag2", "tag3"]
-}`;
-
-  const message = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
-    system: 'You are a professional nutritionist and chef specializing in the Fat Switch Diet — a science-based approach to weight management through strategic food choices. Create healthy, delicious recipes that optimize metabolism and fat-burning.',
-    messages: [{ role: 'user', content: userPrompt }],
-  });
-
-  const jsonMatch = message.content[0].text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Invalid response format from AI');
-  return JSON.parse(jsonMatch[0]);
-}
-
-async function saveRecipe(recipeData, category) {
-  const slug = slugify(recipeData.title, { lower: true, strict: true }) + '-' + Date.now();
-  console.log(`[saveRecipe] saving slug="${slug}" title="${recipeData.title}"`);
-  const catRow = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
-  const imageUrl = await getUnsplashImage(recipeData.title);
-
-  db.prepare(`
-    INSERT INTO recipes (title, slug, description, ingredients, instructions, category_id, prep_time, cook_time, servings, calories, protein, carbs, fat, fiber, tags, image_url, ai_generated)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-  `).run([
-    recipeData.title, slug, recipeData.description,
-    JSON.stringify(recipeData.ingredients), JSON.stringify(recipeData.instructions),
-    catRow?.id || null, recipeData.prep_time, recipeData.cook_time, recipeData.servings,
-    recipeData.calories, recipeData.protein, recipeData.carbs, recipeData.fat, recipeData.fiber,
-    JSON.stringify(recipeData.tags || []), imageUrl,
-  ]);
-
-  return { ...recipeData, slug, image_url: imageUrl };
-}
-
-async function generateAndSaveRecipe(prompt, category, servings = 4, dietary = []) {
-  const recipeData = await generateRecipe(prompt, category, servings, dietary);
-  return saveRecipe(recipeData, category);
-}
-
-const SEED_RECIPES = [
-  { prompt: 'teriyaki salmon bowl',             category: 'Dinner',    servings: 2 },
-  { prompt: 'creamy chicken alfredo',            category: 'Dinner',    servings: 4 },
-  { prompt: 'korean beef bulgogi',               category: 'Dinner',    servings: 4 },
-  { prompt: 'thai green curry chicken',          category: 'Dinner',    servings: 4 },
-  { prompt: 'garlic butter shrimp pasta',        category: 'Dinner',    servings: 2 },
-  { prompt: 'mexican chicken burrito bowl',      category: 'Dinner',    servings: 4 },
-  { prompt: 'japanese gyudon beef rice',         category: 'Dinner',    servings: 2 },
-  { prompt: 'honey garlic pork tenderloin',      category: 'Dinner',    servings: 4 },
-  { prompt: 'fluffy japanese pancakes',          category: 'Breakfast', servings: 2 },
-  { prompt: 'avocado egg toast',                 category: 'Breakfast', servings: 1 },
-  { prompt: 'greek yogurt parfait',              category: 'Breakfast', servings: 1 },
-  { prompt: 'banana oat smoothie bowl',          category: 'Breakfast', servings: 1 },
-  { prompt: 'scrambled eggs with smoked salmon', category: 'Breakfast', servings: 2 },
-  { prompt: 'overnight oats',                    category: 'Breakfast', servings: 1 },
-  { prompt: 'vietnamese chicken pho',            category: 'Lunch',     servings: 2 },
-  { prompt: 'mediterranean quinoa salad',        category: 'Lunch',     servings: 2 },
-  { prompt: 'chicken caesar wrap',               category: 'Lunch',     servings: 1 },
-  { prompt: 'tom yum soup',                      category: 'Lunch',     servings: 2 },
-  { prompt: 'spicy tuna poke bowl',              category: 'Lunch',     servings: 1 },
-  { prompt: 'chocolate lava cake',               category: 'Desserts',  servings: 2 },
-  { prompt: 'mango sticky rice',                 category: 'Desserts',  servings: 2 },
-  { prompt: 'tiramisu lightened',                category: 'Desserts',  servings: 6 },
-  { prompt: 'protein energy balls',              category: 'Snacks',    servings: 12 },
-  { prompt: 'baked sweet potato chips',          category: 'Snacks',    servings: 2 },
-  { prompt: 'almond butter apple slices',        category: 'Snacks',    servings: 1 },
-  // Batch 2 – Western (8)
-  { prompt: 'spaghetti carbonara',               category: 'Dinner',    servings: 4 },
-  { prompt: 'beef tacos',                        category: 'Dinner',    servings: 4 },
-  { prompt: 'greek salad',                       category: 'Lunch',     servings: 2 },
-  { prompt: 'french onion soup',                 category: 'Lunch',     servings: 4 },
-  { prompt: 'eggs benedict',                     category: 'Breakfast', servings: 2 },
-  { prompt: 'mushroom risotto',                  category: 'Dinner',    servings: 4 },
-  { prompt: 'banana foster pancakes',            category: 'Breakfast', servings: 2 },
-  { prompt: 'acai bowl',                         category: 'Breakfast', servings: 1 },
-  // Batch 2 – Asian / Middle East (12)
-  { prompt: 'butter chicken curry',              category: 'Dinner',    servings: 4 },
-  { prompt: 'pad see ew noodles',                category: 'Dinner',    servings: 2 },
-  { prompt: 'beef bibimbap',                     category: 'Dinner',    servings: 2 },
-  { prompt: 'chicken shawarma wrap',             category: 'Lunch',     servings: 2 },
-  { prompt: 'laksa soup',                        category: 'Lunch',     servings: 2 },
-  { prompt: 'beef rendang',                      category: 'Dinner',    servings: 4 },
-  { prompt: 'chicken tikka masala',              category: 'Dinner',    servings: 4 },
-  { prompt: 'vietnamese spring rolls',           category: 'Snacks',    servings: 4 },
-  { prompt: 'korean fried rice',                 category: 'Dinner',    servings: 2 },
-  { prompt: 'turkish eggs cilbir',               category: 'Breakfast', servings: 2 },
-  { prompt: 'japanese miso ramen',               category: 'Dinner',    servings: 2 },
-  { prompt: 'moroccan lamb tagine',              category: 'Dinner',    servings: 4 },
-];
-
-app.get('/admin/run-seed', async (req, res) => {
-  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
-
-  const skip = Math.max(0, parseInt(req.query.skip || '0', 10));
-  const batch = SEED_RECIPES.slice(skip);
-
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('Transfer-Encoding', 'chunked');
-  res.flushHeaders();
-
-  const write = (line) => res.write(line + '\n');
-  write(`=== FatSwitchDiet Admin Seed ===`);
-  write(`Total recipes: ${SEED_RECIPES.length} | Skipping first: ${skip} | To generate: ${batch.length}`);
-  write('');
-
-  let ok = 0, fail = 0;
-  for (let i = 0; i < batch.length; i++) {
-    const { prompt, category, servings } = batch[i];
-    const label = `[${skip + i + 1}/${SEED_RECIPES.length}] ${prompt} (${category})`;
-    try {
-      const recipe = await generateAndSaveRecipe(prompt, category, servings);
-      write(`✓ ${label} → "${recipe.title}"`);
-      ok++;
-    } catch (err) {
-      write(`✗ ${label} → ${err.message}`);
-      fail++;
-    }
-    if (i < batch.length - 1) await new Promise((r) => setTimeout(r, 3000));
-  }
-
-  write('');
-  write(`=== Seeding done: ${ok} succeeded, ${fail} failed ===`);
-
-  // Backfill images for any recipes still missing one
-  const missing = db.prepare("SELECT id, title FROM recipes WHERE image_url IS NULL OR image_url = '' ORDER BY id").all();
-  if (missing.length > 0) {
-    write('');
-    write(`=== Backfilling images for ${missing.length} recipes ===`);
-    let imgOk = 0, imgFail = 0;
-    for (let i = 0; i < missing.length; i++) {
-      const { id, title } = missing[i];
-      try {
-        const url = await getUnsplashImage(title);
-        db.prepare('UPDATE recipes SET image_url = ? WHERE id = ?').run([url, id]);
-        write(`  img ✓ ${title}`);
-        imgOk++;
-      } catch (err) {
-        write(`  img ✗ ${title} → ${err.message}`);
-        imgFail++;
+  "title": "Recipe Title (catchy, SEO-optimised, max 60 chars)",
+  "description": "2-3 sentence enticing description mentioning the Fat Switch calorie savings",
+  "category": "Breakfast or Lunch or Dinner or Snack or Dessert",
+  "cuisine": "e.g. Italian, Korean, Thai, Western, Japanese",
+  "prep_time": 20,
+  "cook_time": 30,
+  "servings": 4,
+  "difficulty": "Easy or Medium or Hard",
+  "fat_switch": {
+    "original_kcal": 580,
+    "switched_kcal": 350,
+    "savings_kcal": 230,
+    "savings_pct": 40,
+    "headline": "One punchy sentence about the swap benefit",
+    "swaps": [
+      {
+        "original": "Full-fat cream (1 cup)",
+        "switched": "Greek yogurt (3/4 cup)",
+        "reason": "Same creaminess, 60% less saturated fat"
       }
-      if (i < missing.length - 1) await new Promise((r) => setTimeout(r, 500));
-    }
-    write(`=== Images done: ${imgOk} updated, ${imgFail} failed ===`);
-  } else {
-    write('All recipes already have images.');
-  }
+    ]
+  },
+  "why_love": [
+    { "icon": "✅", "title": "Short title", "detail": "One sentence explanation" }
+  ],
+  "ingredients": {
+    "main": ["2 cups ingredient", "1 tsp ingredient"],
+    "filling_or_sauce": ["200g ingredient", "1/2 cup ingredient"]
+  },
+  "instructions": [
+    { "title": "Step title", "detail": "Clear, detailed instruction for this step." }
+  ],
+  "nutrition": {
+    "original": { "calories": 580, "protein": 18, "carbs": 52, "fat": 28, "sat_fat": 14 },
+    "switched": { "calories": 350, "protein": 22, "carbs": 48, "fat": 10, "sat_fat": 3.5 }
+  },
+  "pro_tips": [
+    { "icon": "🌡️", "title": "Tip title", "detail": "Practical tip from kitchen testing." }
+  ],
+  "origin": "2-3 paragraphs about the dish's cultural origin and why this Fat Switch version works.",
+  "faq": [
+    { "q": "Question about this specific recipe?", "a": "Clear, helpful answer." }
+  ],
+  "related_keywords": ["keyword1", "keyword2", "keyword3"],
+  "meta_description": "SEO meta description under 155 characters"
+}
 
-  res.end();
+Requirements:
+- why_love: exactly 4 items
+- ingredients main: 6-10 items, filling_or_sauce: 4-8 items
+- instructions: 6-10 steps
+- pro_tips: exactly 5 items
+- faq: exactly 5 Q&A pairs
+- related_keywords: exactly 3 items
+- All numbers must be realistic and accurate
+- Fat Switch savings must be 30-45% calorie reduction`;
+}
+
+// ════════════════════════════════════════════════════════════
+//  ROUTES
+// ════════════════════════════════════════════════════════════
+
+// ── Homepage ─────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  const recent = db.getRecentRecipes();
+  const total  = db.getTotalCount();
+  res.render('index', { recipes: recent, total, formatDate });
 });
 
-app.get('/admin/refresh-images', async (req, res) => {
-  if (req.query.key !== 'fatswitchdev2026') return res.status(403).json({ error: 'Forbidden' });
-
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('Transfer-Encoding', 'chunked');
-  res.flushHeaders();
-
-  const write = (line) => res.write(line + '\n');
-  const recipes = db.prepare('SELECT id, title FROM recipes ORDER BY id').all();
-  write(`=== Refreshing images for ALL ${recipes.length} recipes ===\n`);
-
-  let ok = 0, fail = 0;
-  for (let i = 0; i < recipes.length; i++) {
-    const { id, title } = recipes[i];
-    try {
-      const url = await getUnsplashImage(title);
-      db.prepare('UPDATE recipes SET image_url = ? WHERE id = ?').run([url, id]);
-      write(`✓ [${i + 1}/${recipes.length}] ${title}`);
-      ok++;
-    } catch (err) {
-      write(`✗ [${i + 1}/${recipes.length}] ${title} → ${err.message}`);
-      fail++;
-    }
-    if (i < recipes.length - 1) await new Promise((r) => setTimeout(r, 500));
-  }
-
-  write(`\n=== Done: ${ok} updated, ${fail} failed ===`);
-  res.end();
+// ── Generator Page ───────────────────────────────────────────
+// FIX: Pass isAdmin flag to template based on query param
+app.get('/generator', (req, res) => {
+  const isAdmin = req.query.admin === ADMIN_KEY;
+  res.render('generator', { isAdmin });
 });
 
-app.post('/api/generate-recipe', aiLimiter, async (req, res) => {
+// ── Recipe Page (SSR for SEO) ─────────────────────────────────
+app.get('/recipe/:slug', (req, res) => {
+  const recipe = db.getRecipe(req.params.slug);
+  if (!recipe) return res.status(404).render('404');
+  res.render('recipe', { recipe, formatDate });
+});
+
+// ── Category Page ─────────────────────────────────────────────
+app.get('/category/:cat', (req, res) => {
+  const cat = req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1);
+  const recipes = db.getByCategory(cat);
+  res.render('category', { recipes, category: cat, formatDate });
+});
+
+// ── Static Pages ──────────────────────────────────────────────
+app.get('/about',          (req, res) => res.render('about'));
+app.get('/contact',        (req, res) => res.render('contact'));
+app.get('/privacy-policy', (req, res) => res.render('privacy'));
+app.get('/diet-plan',      (req, res) => res.render('diet-plan'));
+
+// ════════════════════════════════════════════════════════════
+//  API ROUTES
+// ════════════════════════════════════════════════════════════
+
+// ── POST /api/generate ────────────────────────────────────────
+// FIX: Only saves to DB when valid adminKey is provided in request body
+app.post('/api/generate', async (req, res) => {
+  const { keyword, cuisine, dietary, adminKey } = req.body;
+
+  if (!keyword || keyword.trim().length < 2) {
+    return res.status(400).json({ error: 'Please enter a recipe keyword.' });
+  }
+
+  // FIX: Check admin key from request body
+  const isAdmin = adminKey === ADMIN_KEY;
+
   try {
-    const { prompt, category, servings = 4, dietary = [], admin_key } = req.body;
-    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
-
-    const isAdmin = admin_key === 'fatswitchdev2026';
-    console.log(`[generate-recipe] admin_key received=${!!admin_key} isAdmin=${isAdmin} prompt="${prompt}"`);
-
-    const recipeData = await generateRecipe(prompt, category, servings, dietary);
-
-    if (isAdmin) {
-      const recipe = await saveRecipe(recipeData, category);
-      console.log(`[generate-recipe] saved=true slug="${recipe.slug}"`);
-      return res.json({ success: true, recipe, saved: true });
-    }
-
-    console.log(`[generate-recipe] saved=false (public mode)`);
-    res.json({ success: true, recipe: recipeData, saved: false });
-  } catch (err) {
-    console.error('Recipe generation error:', err);
-    res.status(500).json({ error: 'Failed to generate recipe. Please try again.' });
-  }
-});
-
-app.post('/api/generate-diet-plan', aiLimiter, async (req, res) => {
-  try {
-    const { goal, duration = 7, calories, restrictions = [] } = req.body;
-    if (!goal) return res.status(400).json({ error: 'Goal is required' });
-
-    const restrictStr = restrictions.length ? `Dietary restrictions: ${restrictions.join(', ')}.` : '';
-
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const message = await claude.messages.create({
+      model:      'claude-haiku-4-5-20251001',
       max_tokens: 4096,
-      system: 'You are a certified nutritionist specializing in the Fat Switch Diet method. Create personalized, science-backed meal plans.',
       messages: [{
-        role: 'user',
-        content: `Create a ${duration}-day Fat Switch Diet meal plan for goal: "${goal}".
-Target calories: ${calories || 'auto-calculate for goal'}. ${restrictStr}
-
-Respond ONLY with valid JSON:
-{
-  "name": "Plan Name",
-  "description": "Plan overview 2-3 sentences",
-  "goal": "${goal}",
-  "duration_days": ${duration},
-  "calories_per_day": 1800,
-  "meal_plan": [
-    {
-      "day": 1,
-      "breakfast": {"name": "Meal name", "calories": 400, "notes": "brief note"},
-      "lunch": {"name": "Meal name", "calories": 500, "notes": "brief note"},
-      "dinner": {"name": "Meal name", "calories": 600, "notes": "brief note"},
-      "snack": {"name": "Snack name", "calories": 200, "notes": "brief note"}
-    }
-  ]
-}`
-      }],
+        role:    'user',
+        content: buildPrompt(keyword.trim(), cuisine, dietary)
+      }]
     });
 
-    const content = message.content[0].text;
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Invalid response format');
+    const raw = message.content[0].text.trim();
 
-    const planData = JSON.parse(jsonMatch[0]);
-    const slug = slugify(planData.name, { lower: true, strict: true }) + '-' + Date.now();
+    // Strip any accidental markdown fences
+    const clean = raw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const data  = JSON.parse(clean);
 
-    db.prepare(`
-      INSERT INTO diet_plans (name, slug, description, duration_days, calories_per_day, goal, meal_plan, ai_generated)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-    `).run([planData.name, slug, planData.description, planData.duration_days, planData.calories_per_day, planData.goal, JSON.stringify(planData.meal_plan)]);
+    // Validate essential fields
+    if (!data.title || !data.ingredients || !data.instructions) {
+      throw new Error('Incomplete recipe data returned.');
+    }
 
-    res.json({ success: true, plan: planData });
+    const slug = makeSlug(data.title);
+
+    if (isAdmin) {
+      // FIX: Only save to DB when admin
+      db.saveRecipe({
+        slug,
+        title:    data.title,
+        category: data.category || 'Dinner',
+        cuisine:  data.cuisine  || 'International',
+        keyword:  keyword.trim(),
+        data
+      });
+
+      // FIX: Verify recipe actually saved before returning slug (prevents 404 bug)
+      const saved = db.getRecipe(slug);
+      if (!saved) {
+        return res.status(500).json({ error: 'Recipe generated but failed to save. Please try again.' });
+      }
+
+      // Admin: return slug so frontend can redirect to the saved recipe page
+      return res.json({ success: true, slug, title: data.title, savedToDB: true });
+    }
+
+    // Public: return recipe data directly (no DB save, no redirect)
+    res.json({ success: true, slug: null, title: data.title, data, savedToDB: false });
+
   } catch (err) {
-    console.error('Diet plan generation error:', err);
-    res.status(500).json({ error: 'Failed to generate diet plan. Please try again.' });
+    console.error('Generate error:', err.message);
+
+    if (err instanceof SyntaxError) {
+      return res.status(500).json({ error: 'AI returned unexpected format. Please try again.' });
+    }
+    res.status(500).json({ error: 'Generation failed. Please try again in a moment.' });
   }
 });
 
-// ─── 404 ────────────────────────────────────────────────────────────────────
+// ── GET /api/recipe/:slug (JSON) ──────────────────────────────
+app.get('/api/recipe/:slug', (req, res) => {
+  const recipe = db.getRecipe(req.params.slug);
+  if (!recipe) return res.status(404).json({ error: 'Recipe not found.' });
+  res.json(recipe);
+});
 
-app.use((req, res) => res.status(404).render('404', { categories: getCategories(), page: '404' }));
+// ── GET /api/recipes (list) ───────────────────────────────────
+app.get('/api/recipes', (req, res) => {
+  const { q, category } = req.query;
+  let recipes;
+  if (q)        recipes = db.searchRecipes(q);
+  else if (category) recipes = db.getByCategory(category);
+  else          recipes = db.getAllRecipes();
+  res.json(recipes);
+});
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`FatSwitchDiet v2 listening on 0.0.0.0:${PORT}`);
-  console.log(`[startup] NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
-  const dbBase = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DB_PATH || './data';
-  const dbResolved = dbBase.endsWith('.db') ? dbBase : `${dbBase}/recipes.db`;
-  console.log(`[startup] DB resolved to: ${dbResolved}`);
+// ── GET /api/search ───────────────────────────────────────────
+app.get('/api/search', (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json([]);
+  res.json(db.searchRecipes(q));
+});
+
+// ── POST /api/generate-plan ───────────────────────────────────
+app.post('/api/generate-plan', async (req, res) => {
+  const { goal, activity, prefs, weight, target, name } = req.body;
+
+  if (!goal) return res.status(400).json({ error: 'Please complete all steps.' });
+
+  // Estimate daily calories (simple Harris-Benedict approximation)
+  const activityMult = { sedentary: 1.2, moderate: 1.55, active: 1.725 };
+  const mult    = activityMult[activity] || 1.375;
+  const bmr     = 10 * (weight || 70) + 500;          // simplified
+  let   tdee    = Math.round(bmr * mult);
+  if (goal === 'lose_fat')     tdee = Math.round(tdee * 0.8);
+  if (goal === 'build_muscle') tdee = Math.round(tdee * 1.1);
+
+  const dailyProtein = goal === 'build_muscle' ? Math.round((weight || 70) * 2.2) :
+                       goal === 'lose_fat'      ? Math.round((weight || 70) * 1.8) :
+                                                  Math.round((weight || 70) * 1.4);
+
+  const prefStr = (prefs && prefs.length) ? prefs.join(', ') : 'no restrictions';
+
+  const prompt = `You are a professional nutritionist for FatSwitchDiet.com, experts in healthy ingredient swaps.
+
+Create a personalised 7-day meal plan for:
+- Goal: ${goal}
+- Daily Calorie Target: ${tdee} kcal
+- Daily Protein Target: ${dailyProtein}g
+- Food preferences: ${prefStr}
+- Current weight: ${weight}kg → Target: ${target}kg
+
+Return ONLY valid JSON. No markdown. No backticks. No extra text. Exact structure:
+
+{
+  "daily_calories": ${tdee},
+  "daily_protein": ${dailyProtein},
+  "days": [
+    {
+      "theme": "Energising Start",
+      "total_kcal": 1480,
+      "tip": "One practical diet or lifestyle tip for this day",
+      "meals": [
+        {
+          "type": "Breakfast",
+          "name": "Meal name",
+          "description": "Brief description with portion size",
+          "fat_switch_tip": "One Fat Switch swap tip for this meal",
+          "kcal": 380
+        },
+        { "type": "Lunch", "name": "...", "description": "...", "fat_switch_tip": "...", "kcal": 420 },
+        { "type": "Snack", "name": "...", "description": "...", "fat_switch_tip": "...", "kcal": 180 },
+        { "type": "Dinner", "name": "...", "description": "...", "fat_switch_tip": "...", "kcal": 500 }
+      ]
+    }
+  ]
+}
+
+Requirements:
+- Exactly 7 days
+- Each day has exactly 4 meals: Breakfast, Lunch, Snack, Dinner
+- Every meal must have a fat_switch_tip (a specific smart swap for that meal)
+- Each day's theme should be different and motivating
+- Vary cuisines across the 7 days (mix Asian, Western, Mediterranean etc)
+- All calorie numbers must add up realistically
+- Keep meals practical and easy to prepare`;
+
+  try {
+    const message = await claude.messages.create({
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const raw   = message.content[0].text.trim();
+    const clean = raw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+    const plan  = JSON.parse(clean);
+
+    if (!plan.days || plan.days.length !== 7) {
+      throw new Error('Invalid plan structure from AI.');
+    }
+
+    res.json({ success: true, plan });
+
+  } catch (err) {
+    console.error('Diet plan error:', err.message);
+    if (err instanceof SyntaxError) {
+      return res.status(500).json({ error: 'AI returned unexpected format. Please try again.' });
+    }
+    res.status(500).json({ error: 'Plan generation failed. Please try again in a moment.' });
+  }
+});
+
+// ── 404 fallback ──────────────────────────────────────────────
+app.use((req, res) => res.status(404).render('404'));
+
+// ── Start ─────────────────────────────────────────────────────
+app.listen(PORT, () => {
+  console.log(`✅ FatSwitchDiet running on http://localhost:${PORT}`);
 });
