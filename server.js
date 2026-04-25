@@ -167,6 +167,7 @@ app.get('/category/:cat', (req, res) => {
 app.get('/about',          (req, res) => res.render('about',      { page: 'about',      categories: db.getCategories() }));
 app.get('/contact',        (req, res) => res.render('contact',    { page: 'contact',    categories: db.getCategories() }));
 app.get('/privacy-policy', (req, res) => res.render('privacy',    { page: 'privacy',    categories: db.getCategories() }));
+app.get('/privacy',        (req, res) => res.render('privacy',    { page: 'privacy',    categories: db.getCategories() }));
 app.get('/diet-plan',      (req, res) => res.render('diet-plan',  { page: 'diet-plan',  categories: db.getCategories(), plans: [] }));
 
 // ════════════════════════════════════════════════════════════

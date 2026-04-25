@@ -96,9 +96,46 @@ if (form) form.addEventListener('submit', async (e) => {
     if (!res.ok || !data.success) throw new Error(data.error || 'Generation failed');
 
     const r = data.recipe;
+    const isAdmin = !!r.slug;
     const totalTime = (r.prep_time || 0) + (r.cook_time || 0);
+
+    let ingredientsHtml;
+    if (isAdmin) {
+      ingredientsHtml = `<ul style="list-style:none; margin-bottom:1.5rem;">
+        ${r.ingredients.map(i => `<li style="padding:0.4rem 0; border-bottom:1px solid var(--gray-100);">✓ ${i}</li>`).join('')}
+      </ul>`;
+    } else {
+      const shown = r.ingredients.slice(0, 3);
+      const remaining = r.ingredients.length - 3;
+      ingredientsHtml = `<ul style="list-style:none; margin-bottom:0.5rem;">
+        ${shown.map(i => `<li style="padding:0.4rem 0; border-bottom:1px solid var(--gray-100);">✓ ${i}</li>`).join('')}
+      </ul>
+      ${remaining > 0 ? `<p style="color:var(--gray-600); font-size:0.9rem; margin-bottom:1.5rem;">... and ${remaining} more ingredients</p>` : ''}`;
+    }
+
+    let instructionsHtml;
+    if (isAdmin) {
+      instructionsHtml = `<ol style="padding-left:1.25rem; margin-bottom:1.5rem;">
+        ${r.instructions.map(s => `<li style="padding:0.4rem 0;">${s}</li>`).join('')}
+      </ol>`;
+    } else {
+      const shownSteps = r.instructions.slice(0, 2);
+      instructionsHtml = `<ol style="padding-left:1.25rem; margin-bottom:0.5rem;">
+        ${shownSteps.map(s => `<li style="padding:0.4rem 0;">${s}</li>`).join('')}
+      </ol>
+      <p style="color:var(--gray-600); font-size:0.9rem; margin-bottom:1.5rem;">... view full recipe for all steps</p>`;
+    }
+
+    const ctaHtml = isAdmin
+      ? `<a href="/recipe/${r.slug}" class="btn btn-primary">View Full Recipe →</a>`
+      : `<div style="background:var(--gray-100); border-radius:var(--radius); padding:1.25rem; text-align:center; margin-top:0.5rem;">
+          <p style="font-weight:600; margin-bottom:0.25rem;">Want the complete recipe?</p>
+          <p style="font-size:0.85rem; color:var(--gray-600); margin-bottom:1rem;">Generate with admin to save</p>
+          <a href="/generator" class="btn btn-orange">🔗 Save &amp; View Full Recipe →</a>
+        </div>`;
+
     resultContent.innerHTML = `
-      <div class="alert alert-success">✅ Recipe generated and saved!</div>
+      <div class="alert alert-success">${isAdmin ? '✅ Recipe generated and saved!' : '✅ Recipe generated — preview below'}</div>
       <h2 style="margin-bottom:0.5rem; color:var(--green-dark);">${r.title}</h2>
       <p style="color:var(--gray-600); margin-bottom:1rem;">${r.description}</p>
       <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;">
@@ -109,15 +146,11 @@ if (form) form.addEventListener('submit', async (e) => {
         ${r.fat ? `<span>🥑 ${r.fat}g fat</span>` : ''}
       </div>
       <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">🛒 Ingredients</h3>
-      <ul style="list-style:none; margin-bottom:1.5rem;">
-        ${r.ingredients.map(i => `<li style="padding:0.4rem 0; border-bottom:1px solid var(--gray-100);">✓ ${i}</li>`).join('')}
-      </ul>
+      ${ingredientsHtml}
       <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">👨‍🍳 Instructions</h3>
-      <ol style="padding-left:1.25rem;">
-        ${r.instructions.map(s => `<li style="padding:0.4rem 0;">${s}</li>`).join('')}
-      </ol>
-      <div style="margin-top:1.5rem;">
-        ${r.slug ? `<a href="/recipe/${r.slug}" class="btn btn-primary">View Full Recipe →</a>` : ''}
+      ${instructionsHtml}
+      <div style="margin-top:1rem;">
+        ${ctaHtml}
       </div>
     `;
     resultContent.style.display = 'block';
