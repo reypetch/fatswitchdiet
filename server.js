@@ -113,7 +113,7 @@ app.get('/', (req, res) => {
 
 // ── Generator Page ───────────────────────────────────────────
 app.get('/generator', (req, res) => {
-  res.render('generator');
+  res.render('generator', { page: 'generator', categories: db.getCategories() });
 });
 
 // ── Recipe Page (SSR for SEO) ─────────────────────────────────
