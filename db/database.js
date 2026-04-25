@@ -2,11 +2,11 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure db directory exists (important on Render — use /tmp or persistent disk)
-const DB_DIR = process.env.DB_PATH || path.join(__dirname, '..', 'data');
+// Resolve DB path — Railway volume takes priority, then DB_PATH, then local ./data
+const dbBase = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DB_PATH || path.join(__dirname, '..', 'data');
+const DB_FILE = dbBase.endsWith('.db') ? dbBase : path.join(dbBase, 'recipes.db');
+const DB_DIR  = path.dirname(DB_FILE);
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
-
-const DB_FILE = path.join(DB_DIR, 'recipes.db');
 const db = new Database(DB_FILE);
 
 // Enable WAL mode for better concurrent read performance
