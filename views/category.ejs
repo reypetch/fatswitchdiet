@@ -1,62 +1,36 @@
-<%- include('partials/header', { title: category.name + ' Recipes' }) %>
-
-<section class="hero" style="padding:3.5rem 0;">
-  <div class="container">
-    <div style="font-size:3rem; margin-bottom:0.5rem;"><%= category.icon %></div>
-    <h1><%= category.name %> Recipes</h1>
-    <p><%= category.description %></p>
+<% pageTitle = category + ' Recipes — FatSwitchDiet'; canonicalUrl = '/category/' + category.toLowerCase(); %>
+<%- include('partials/header') %>
+<div class="static-hero"><h1><%= category %> Recipes</h1><p><%= recipes.length %> Fat Switch recipe<%= recipes.length !== 1 ? 's' : '' %> found</p></div>
+<div class="page-wrap" style="padding-top:40px;padding-bottom:80px">
+  <% if (!recipes.length) { %>
+  <div style="text-align:center;padding:60px 0">
+    <div style="font-size:3rem;margin-bottom:16px">🍽️</div>
+    <h2>No <%= category %> recipes yet</h2>
+    <p style="color:var(--text-mid);margin-bottom:20px">Generate the first one!</p>
+    <a href="/generator" class="btn btn-primary">⚡ Generate a Recipe →</a>
   </div>
-</section>
-
-<div class="container section">
-  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:2rem;">
-    <div>
-      <p style="color:var(--gray-600);"><strong><%= recipes.length %></strong> recipe<%= recipes.length !== 1 ? 's' : '' %> found</p>
-    </div>
-    <a href="/generator" class="btn btn-orange">✨ Generate a New One</a>
-  </div>
-
-  <% if (recipes.length > 0) { %>
-    <div class="grid grid-3">
-      <% recipes.forEach(recipe => { %>
-        <div class="card">
-          <% if (recipe.image_url) { %>
-            <img src="<%= recipe.image_url %>" class="recipe-card-img" alt="<%= recipe.title %>" loading="lazy">
-          <% } else { %>
-            <div class="card-img-placeholder"><%= category.icon %></div>
-          <% } %>
-          <div class="card-body">
-            <% if (recipe.ai_generated) { %><span class="ai-badge mb-1">🤖 AI</span><% } %>
-            <h3 class="card-title"><a href="/recipe/<%= recipe.slug %>"><%= recipe.title %></a></h3>
-            <p class="card-desc"><%= recipe.description %></p>
-            <div class="card-meta">
-              <% if (recipe.prep_time || recipe.cook_time) { %><span>⏱ <%= (recipe.prep_time||0)+(recipe.cook_time||0) %> min</span><% } %>
-              <% if (recipe.calories) { %><span>🔥 <%= recipe.calories %> cal</span><% } %>
-              <% if (recipe.protein) { %><span>💪 <%= recipe.protein %>g</span><% } %>
-            </div>
+  <% } else { %>
+  <div class="recipe-grid">
+    <% recipes.forEach(function(r) { %>
+    <a href="/recipe/<%= r.slug %>" style="text-decoration:none">
+      <div class="recipe-card">
+        <div class="recipe-card-img-placeholder">🍽️</div>
+        <div class="recipe-card-body">
+          <div class="recipe-card-meta">
+            <span class="tag tag-category"><%= r.category %></span>
+            <% if (r.savings_pct) { %><span class="tag tag-swap">⚡ <%= r.savings_pct %>% less</span><% } %>
+          </div>
+          <div class="recipe-card-title"><%= r.title %></div>
+          <div class="recipe-card-desc"><%= r.description ? r.description.substring(0,100)+'…' : '' %></div>
+          <div class="recipe-card-stats">
+            <% if (r.kcal) { %><span>✅ <%= r.kcal %> kcal</span><% } %>
+            <span>👁 <%= r.views %></span>
           </div>
         </div>
-      <% }) %>
-    </div>
-  <% } else { %>
-    <div style="text-align:center; padding:4rem 2rem; background:var(--white); border-radius:var(--radius);">
-      <div style="font-size:4rem; margin-bottom:1rem;"><%= category.icon %></div>
-      <h2 style="margin-bottom:0.5rem;">No recipes yet</h2>
-      <p style="color:var(--gray-600); margin-bottom:1.5rem;">Be the first to generate a <%= category.name.toLowerCase() %> recipe!</p>
-      <a href="/generator" class="btn btn-orange">✨ Generate with AI</a>
-    </div>
-  <% } %>
-
-  <div style="margin-top:3rem;">
-    <h2 style="margin-bottom:1rem; color:var(--green-dark);">Browse Other Categories</h2>
-    <div class="category-grid">
-      <% categories.forEach(cat => { %>
-        <a href="/category/<%= cat.slug %>" class="category-pill <%= cat.slug === category.slug ? 'active' : '' %>">
-          <%= cat.icon %> <%= cat.name %>
-        </a>
-      <% }) %>
-    </div>
+      </div>
+    </a>
+    <% }) %>
   </div>
+  <% } %>
 </div>
-
 <%- include('partials/footer') %>

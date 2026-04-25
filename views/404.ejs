@@ -1,14 +1,12 @@
-<%- include('partials/header', { title: 'Page Not Found' }) %>
-
-<div class="container section" style="text-align:center; padding:6rem 1.5rem;">
-  <div style="font-size:5rem; margin-bottom:1rem;">🥗</div>
-  <h1 style="font-size:4rem; color:var(--green-dark); margin-bottom:0.5rem;">404</h1>
-  <h2 style="font-size:1.5rem; margin-bottom:1rem;">Oops! This recipe doesn't exist.</h2>
-  <p style="color:var(--gray-600); max-width:450px; margin:0 auto 2rem;">The page you're looking for has gone missing, like that last piece of avocado toast.</p>
-  <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
-    <a href="/" class="btn btn-primary">← Back to Home</a>
-    <a href="/generator" class="btn btn-orange">✨ Generate a Recipe</a>
+<% pageTitle = '404 — Page Not Found — FatSwitchDiet'; %>
+<%- include('partials/header') %>
+<div style="text-align:center;padding:100px 24px">
+  <div style="font-size:5rem;margin-bottom:16px">🍽️</div>
+  <h1 style="font-size:3rem;margin-bottom:8px">404</h1>
+  <h2 style="font-weight:400;margin-bottom:20px">This recipe page got lost in the kitchen.</h2>
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+    <a href="/" class="btn btn-outline">← Back to Home</a>
+    <a href="/generator" class="btn btn-primary">⚡ Generate a Recipe</a>
   </div>
 </div>
-
 <%- include('partials/footer') %>

@@ -1,25 +1,19 @@
-<%- include('partials/header', { title: 'Privacy Policy' }) %>
-
-<div class="container section">
-  <div style="max-width:800px; margin:0 auto;">
-    <h1 style="margin-bottom:0.5rem; color:var(--green-dark);">Privacy Policy</h1>
-    <p style="color:var(--gray-600); margin-bottom:2.5rem;">Last updated: <%= new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'}) %></p>
-
-    <% [
-      { title: '1. Information We Collect', body: 'We collect information you provide when using our AI generator features, including recipe prompts and dietary preferences. We do not collect personally identifiable information unless you voluntarily provide it via our contact form.' },
-      { title: '2. How We Use Information', body: 'Recipe prompts are processed by the Anthropic Claude API to generate recipe content. We store generated recipes in our database to improve the site experience. We do not sell or share your data with third parties for marketing purposes.' },
-      { title: '3. AI-Generated Content', body: 'Recipe and diet plan generation uses Anthropic\'s Claude AI. Your prompts are sent to Anthropic\'s API for processing. Please review Anthropic\'s privacy policy for details on how they handle API data.' },
-      { title: '4. Cookies', body: 'We use essential cookies only to maintain site functionality. We do not use tracking or advertising cookies. You can disable cookies in your browser settings without affecting core site functionality.' },
-      { title: '5. Data Security', body: 'We implement reasonable security measures to protect your information. However, no internet transmission is 100% secure. Do not share sensitive personal health information in recipe prompts.' },
-      { title: '6. Medical Disclaimer', body: 'Content on FatSwitchDiet is for informational purposes only and does not constitute medical advice. Always consult a qualified healthcare professional before making significant dietary changes.' },
-      { title: '7. Contact', body: 'For privacy-related questions, please use our contact form.' },
-    ].forEach(section => { %>
-      <div style="background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:1.75rem; margin-bottom:1.25rem;">
-        <h2 style="font-size:1.15rem; color:var(--green-dark); margin-bottom:0.75rem;"><%= section.title %></h2>
-        <p style="color:var(--gray-800); line-height:1.8;"><%= section.body %></p>
-      </div>
-    <% }) %>
-  </div>
+<% pageTitle = 'Privacy Policy — FatSwitchDiet'; canonicalUrl = '/privacy-policy'; %>
+<%- include('partials/header') %>
+<div class="static-hero"><h1>Privacy Policy</h1><p>Last updated: April 20, 2026</p></div>
+<div class="static-content">
+  <p>FatSwitchDiet.com ("we", "us") is committed to protecting your privacy. This policy explains how we collect and use your information.</p>
+  <h2>1. Information We Collect</h2>
+  <ul><li><strong>Usage Data:</strong> Pages visited, browser type, device info, IP address via analytics.</li><li><strong>Contact Data:</strong> Name and email if you contact us.</li><li><strong>Cookies:</strong> For analytics and advertising (see Section 4).</li></ul>
+  <h2>2. Google AdSense</h2>
+  <p>We use Google AdSense to display ads. Google uses cookies to serve personalised ads based on your browsing history. You can opt out at <a href="https://www.google.com/settings/ads" target="_blank" rel="noopener">Google Ads Settings</a>.</p>
+  <h2>3. Google Analytics</h2>
+  <p>We use Google Analytics to analyse site usage. You can opt out via the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Google Analytics opt-out add-on</a>.</p>
+  <h2>4. Cookies</h2>
+  <p>We use necessary, analytics, and advertising cookies. You can control cookies in your browser settings.</p>
+  <h2>5. Your Rights</h2>
+  <p>You may request access, correction, or deletion of your data. Contact us at privacy@fatswitchdiet.com.</p>
+  <h2>6. Contact</h2>
+  <p><a href="/contact">Contact Page</a> · privacy@fatswitchdiet.com</p>
 </div>
-
 <%- include('partials/footer') %>

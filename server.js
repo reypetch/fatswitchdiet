@@ -8,8 +8,6 @@ const db       = require('./db/database');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-const ADMIN_KEY = 'fatswitchdev2026';
-
 // ── Middleware ───────────────────────────────────────────────
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -31,12 +29,12 @@ function formatDate(iso) {
 }
 
 // ── CLAUDE PROMPT ────────────────────────────────────────────
-function buildPrompt(keyword, category, dietary) {
+function buildPrompt(keyword, cuisine, dietary) {
   return `You are a professional nutritionist and recipe developer for FatSwitchDiet.com.
 Your specialty is creating indulgent international recipes alongside a "Fat Switch" — smart ingredient swaps that cut 30–45% of calories while preserving full flavor.
 
 Generate a complete recipe for: "${keyword}"
-Meal category: ${category || 'Any'}
+Cuisine preference: ${cuisine || 'Any international cuisine'}
 Dietary note: ${dietary || 'None'}
 
 Return ONLY valid JSON. No markdown. No backticks. No preamble. Exact structure below:
@@ -106,29 +104,26 @@ Requirements:
 
 // ── Homepage ─────────────────────────────────────────────────
 app.get('/', (req, res) => {
-  const featured   = db.getFeaturedRecipes();
-  const recent     = db.getRecentRecipes();
-  const total      = db.getTotalCount();
-  res.render('index', { featured, recent, recipes: recent, total, formatDate });
+  const recent = db.getRecentRecipes();
+  const total  = db.getTotalCount();
+  res.render('index', { recipes: recent, total, formatDate });
 });
 
 // ── Generator Page ───────────────────────────────────────────
-app.get('/generator', (req, res) => { res.render('generator', { page: 'generator', categories: [] }); });
-
-// ── Recipe Page (SSR for SEO) ─────────────────────────────────
-app.get('/recipe/preview', (req, res) => {
-  res.render('recipe-preview');
+app.get('/generator', (req, res) => {
+  res.render('generator');
 });
 
+// ── Recipe Page (SSR for SEO) ─────────────────────────────────
 app.get('/recipe/:slug', (req, res) => {
   const recipe = db.getRecipe(req.params.slug);
   if (!recipe) return res.status(404).render('404');
-  res.render('recipe', { recipe, related: [], formatDate });
+  res.render('recipe', { recipe, formatDate });
 });
 
 // ── Category Page ─────────────────────────────────────────────
 app.get('/category/:cat', (req, res) => {
-  const cat     = req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1);
+  const cat = req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1);
   const recipes = db.getByCategory(cat);
   res.render('category', { recipes, category: cat, formatDate });
 });
@@ -146,7 +141,6 @@ app.get('/diet-plan',      (req, res) => res.render('diet-plan'));
 // ── POST /api/generate ────────────────────────────────────────
 app.post('/api/generate', async (req, res) => {
   const { keyword, cuisine, dietary } = req.body;
-  const isAdmin = req.body.adminKey === ADMIN_KEY;
 
   if (!keyword || keyword.trim().length < 2) {
     return res.status(400).json({ error: 'Please enter a recipe keyword.' });
@@ -175,19 +169,16 @@ app.post('/api/generate', async (req, res) => {
 
     const slug = makeSlug(data.title);
 
-    if (isAdmin) {
-      db.saveRecipe({
-        slug,
-        title:    data.title,
-        category: cuisine || data.category || 'Dinner',
-        cuisine:  data.cuisine  || 'International',
-        keyword:  keyword.trim(),
-        data
-      });
-    }
+    db.saveRecipe({
+      slug,
+      title:   data.title,
+      category: data.category || 'Dinner',
+      cuisine:  data.cuisine  || 'International',
+      keyword:  keyword.trim(),
+      data
+    });
 
-    if (isAdmin) return res.json({ success: true, slug, title: data.title });
-    res.json({ success: true, slug: null, data, savedToDB: false });
+    res.json({ success: true, slug, title: data.title });
 
   } catch (err) {
     console.error('Generate error:', err.message);

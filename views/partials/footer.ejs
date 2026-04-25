@@ -1,42 +1,46 @@
-  </main>
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div>
-          <div class="footer-brand">🥗 Fat<span>Switch</span>Diet</div>
-          <p class="footer-desc">Science-based recipes and meal plans to help you optimize fat-burning, boost metabolism, and achieve lasting health through smart food choices.</p>
-        </div>
-        <div>
-          <div class="footer-title">Recipes</div>
-          <ul class="footer-links">
-            <% if (typeof categories !== 'undefined') { %>
-              <% categories.slice(0, 4).forEach(cat => { %>
-                <li><a href="/category/<%= cat.slug %>"><%= cat.icon %> <%= cat.name %></a></li>
-              <% }) %>
-            <% } %>
-          </ul>
-        </div>
-        <div>
-          <div class="footer-title">Tools</div>
-          <ul class="footer-links">
-            <li><a href="/generator">✨ AI Recipe Generator</a></li>
-            <li><a href="/diet-plan">📋 Diet Plan Generator</a></li>
-          </ul>
-        </div>
-        <div>
-          <div class="footer-title">Info</div>
-          <ul class="footer-links">
-            <li><a href="/about">About Us</a></li>
-            <li><a href="/contact">Contact</a></li>
-            <li><a href="/privacy">Privacy Policy</a></li>
-          </ul>
-        </div>
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="/" class="site-logo">FatSwitch<span>Diet</span></a>
+        <p>Real recipes. Smarter calories. The Fat Switch method proves you don't have to choose between eating well and eating healthy.</p>
       </div>
-      <div class="footer-bottom">
-        <p>&copy; <%= new Date().getFullYear() %> FatSwitchDiet. Powered by Claude AI. For informational purposes only — consult a healthcare professional before starting any diet.</p>
+      <div class="footer-col">
+        <h4>Recipes</h4>
+        <ul>
+          <li><a href="/category/breakfast">Breakfast</a></li>
+          <li><a href="/category/lunch">Lunch</a></li>
+          <li><a href="/category/dinner">Dinner</a></li>
+          <li><a href="/category/asian">Asian</a></li>
+          <li><a href="/category/western">Western</a></li>
+          <li><a href="/category/dessert">Dessert</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Tools</h4>
+        <ul>
+          <li><a href="/generator">⚡ AI Recipe Generator</a></li>
+          <li><a href="/diet-plan">📋 Free 7-Day Diet Plan</a></li>
+          <li><a href="/about">About</a></li>
+          <li><a href="/contact">Contact</a></li>
+          <li><a href="/privacy-policy">Privacy Policy</a></li>
+        </ul>
       </div>
     </div>
-  </footer>
-  <%- typeof extraScripts !== 'undefined' ? extraScripts : '' %>
+    <div class="footer-bottom">
+      <span>© <%= new Date().getFullYear() %> FatSwitchDiet.com — All Rights Reserved</span>
+      <div class="footer-bottom-links">
+        <a href="/privacy-policy">Privacy</a>
+        <a href="/contact">Contact</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('menuBtn').addEventListener('click', function() {
+    document.getElementById('siteNav').classList.toggle('open');
+  });
+</script>
 </body>
 </html>

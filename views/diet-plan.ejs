@@ -1,163 +1,772 @@
-<%- include('partials/header', { title: 'AI Diet Plan Generator' }) %>
+<%
+  pageTitle    = 'Free 7-Day Fat Switch Diet Plan Generator — FatSwitchDiet';
+  metaDesc     = 'Get a personalised 7-day Fat Switch meal plan in seconds. Tell us your goals and our AI builds a complete plan with calorie targets and recipe ideas.';
+  canonicalUrl = '/diet-plan';
+%>
+<%- include('partials/header') %>
 
-<section class="hero" style="padding:4rem 0;">
-  <div class="container">
-    <h1>📋 AI Diet Plan Generator</h1>
-    <p>Get a complete personalized meal plan tailored to your goals — powered by Claude AI and the Fat Switch method.</p>
+<style>
+/* ── Diet Plan Page ── */
+.plan-hero {
+  background: linear-gradient(135deg, var(--forest) 0%, #0D2B1F 100%);
+  padding: 72px 24px 100px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.plan-hero::before {
+  content: '🌿';
+  position: absolute;
+  font-size: 22rem;
+  opacity: 0.04;
+  top: -60px; right: -60px;
+  line-height: 1;
+}
+.plan-hero::after {
+  content: '⚡';
+  position: absolute;
+  font-size: 16rem;
+  opacity: 0.04;
+  bottom: -40px; left: -40px;
+  line-height: 1;
+}
+
+.plan-wizard {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  max-width: 700px;
+  margin: -60px auto 0;
+  position: relative;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.15);
+  border: 1px solid var(--border);
+}
+
+/* Progress bar */
+.wizard-progress {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 36px;
+}
+.wizard-step-dot {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-light);
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+.wizard-step-dot.active { background: var(--forest); color: var(--cream); }
+.wizard-step-dot.done   { background: var(--amber); color: var(--white); }
+.wizard-step-dot.done::after { content: '✓'; }
+.wizard-line {
+  flex: 1; height: 3px;
+  background: var(--border);
+  transition: background 0.4s;
+}
+.wizard-line.done { background: var(--amber); }
+
+/* Steps */
+.wizard-step { display: none; }
+.wizard-step.active { display: block; animation: fadeUp 0.4s ease both; }
+
+.step-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--forest);
+  margin-bottom: 6px;
+}
+.step-subtitle {
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  color: var(--text-light);
+  margin-bottom: 24px;
+}
+
+/* Option cards */
+.option-grid {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.option-grid-2 { grid-template-columns: 1fr 1fr; }
+.option-grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+.option-card {
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  background: var(--white);
+}
+.option-card:hover { border-color: var(--forest-mid); background: var(--cream); }
+.option-card.selected { border-color: var(--forest); background: #F0FFF8; }
+.option-card .opt-icon { font-size: 1.8rem; margin-bottom: 6px; }
+.option-card .opt-label {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--forest);
+}
+.option-card .opt-desc {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin-top: 3px;
+}
+
+/* Range slider */
+.slider-wrap { margin-bottom: 24px; }
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--text-light);
+  margin-bottom: 6px;
+}
+.slider-val {
+  font-size: 1.4rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--forest);
+}
+input[type=range] {
+  width: 100%;
+  accent-color: var(--forest);
+  height: 6px;
+  cursor: pointer;
+}
+
+/* Plan form inputs */
+.plan-input {
+  width: 100%;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--text);
+  outline: none;
+  margin-bottom: 14px;
+  transition: border-color 0.2s;
+}
+.plan-input:focus { border-color: var(--forest); }
+
+.plan-btn {
+  width: 100%;
+  background: var(--forest);
+  color: var(--cream);
+  border: none;
+  border-radius: var(--radius);
+  padding: 16px;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.plan-btn:hover:not(:disabled) {
+  background: var(--amber);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(30,58,47,0.2);
+}
+.plan-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.plan-btn-back {
+  width: 100%;
+  background: none;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  color: var(--text-light);
+  cursor: pointer;
+  margin-top: 10px;
+  transition: all 0.2s;
+}
+.plan-btn-back:hover { border-color: var(--forest); color: var(--forest); }
+
+/* Email gate */
+.email-gate {
+  background: linear-gradient(135deg, #F0FFF8, #E8F8EE);
+  border: 2px solid #B8DFC1;
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.email-gate h3 {
+  font-family: var(--font-display);
+  color: var(--forest);
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+}
+.email-gate p {
+  font-size: 0.88rem;
+  color: var(--text-mid);
+  margin-bottom: 16px;
+}
+
+/* Loading */
+.plan-loading {
+  display: none;
+  text-align: center;
+  padding: 40px 20px;
+}
+.plan-loading-spinner {
+  width: 56px; height: 56px;
+  border: 5px solid var(--border);
+  border-top-color: var(--forest);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  margin: 0 auto 20px;
+}
+
+/* Results */
+.plan-result { display: none; }
+.plan-result-header {
+  background: var(--forest);
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.plan-result-header-info { flex: 1; }
+.plan-result-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--cream);
+  margin-bottom: 6px;
+}
+.plan-result-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: rgba(250,247,240,0.7);
+}
+.plan-result-stats strong { color: var(--amber-light); }
+
+.day-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.day-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  cursor: pointer;
+  background: var(--cream);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+.day-header:hover { background: var(--cream-dark); }
+.day-num {
+  width: 36px; height: 36px;
+  background: var(--forest);
+  color: var(--cream);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.day-title {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--forest);
+}
+.day-kcal {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--text-light);
+}
+.day-toggle { color: var(--amber); font-size: 1.1rem; transition: transform 0.3s; }
+.day-card.open .day-toggle { transform: rotate(45deg); }
+.day-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease;
+}
+.day-card.open .day-body { max-height: 600px; }
+.day-body-inner { padding: 16px 20px; }
+
+.meal-row {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: flex-start;
+}
+.meal-row:last-child { border-bottom: none; }
+.meal-label {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  width: 80px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.meal-content { flex: 1; }
+.meal-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--forest);
+}
+.meal-detail {
+  font-size: 0.82rem;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+.meal-kcal {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--amber);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Share strip */
+.share-strip {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.share-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 30px;
+  border: 2px solid var(--border);
+  background: var(--white);
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.share-btn:hover { border-color: var(--forest); color: var(--forest); }
+.share-btn.copied { background: #EBF5ED; border-color: #B8DFC1; color: #155724; }
+
+@media (max-width: 600px) {
+  .option-grid-2, .option-grid-3 { grid-template-columns: 1fr 1fr; }
+  .plan-wizard { padding: 24px 20px; }
+}
+</style>
+
+<!-- ══ HERO ══ -->
+<section class="plan-hero">
+  <div style="position:relative;max-width:600px;margin:0 auto">
+    <p style="font-family:var(--font-ui);font-size:0.78rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--amber-light);margin-bottom:12px">Free AI Tool ✦ FatSwitchDiet</p>
+    <h1 style="color:var(--cream);font-size:clamp(1.8rem,5vw,3rem);margin-bottom:14px">Your Personal<br>7-Day Fat Switch Plan</h1>
+    <p style="color:rgba(250,247,240,0.75);font-size:1rem;max-width:460px;margin:0 auto">Answer 4 quick questions and our AI builds a personalised meal plan with daily calorie targets, 3 meals + snack, and Fat Switch recipe ideas — free.</p>
   </div>
 </section>
 
-<div class="container section">
-  <div class="generator-layout">
-    <div class="generator-form-card">
-      <h2 style="margin-bottom:1.5rem; color:var(--green-dark);">Create Your Plan</h2>
-      <form id="planForm">
-        <div class="form-group">
-          <label class="form-label" for="goal">Your Goal *</label>
-          <select class="form-control" id="goal" name="goal" required>
-            <option value="">Select your goal...</option>
-            <option value="Weight Loss">🔥 Weight Loss</option>
-            <option value="Muscle Gain">💪 Muscle Gain</option>
-            <option value="Maintenance">⚖️ Weight Maintenance</option>
-            <option value="Metabolic Reset">🔬 Metabolic Reset</option>
-            <option value="Energy Boost">⚡ Energy & Vitality</option>
-            <option value="Gut Health">🌿 Gut Health & Digestion</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="duration">Plan Duration</label>
-          <select class="form-control" id="duration" name="duration">
-            <option value="3">3 days</option>
-            <option value="7" selected>7 days</option>
-            <option value="14">14 days</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="calories">Daily Calorie Target (optional)</label>
-          <input type="number" class="form-control" id="calories" name="calories" placeholder="e.g. 1800 (leave blank for auto)" min="1200" max="4000">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Dietary Restrictions</label>
-          <div class="form-check">
-            <% ['Vegan', 'Vegetarian', 'Gluten-Free', 'Dairy-Free', 'Nut-Free', 'Low-Carb'].forEach(d => { %>
-              <label class="form-check-item">
-                <input type="checkbox" name="restrictions" value="<%= d %>">
-                <%= d %>
-              </label>
-            <% }) %>
-          </div>
-        </div>
-        <button type="submit" class="btn btn-orange btn-lg" style="width:100%; justify-content:center;" id="planBtn">
-          📋 Generate My Plan
-        </button>
-      </form>
+<div class="page-wrap">
+
+  <!-- ══ WIZARD CARD ══ -->
+  <div class="plan-wizard" id="planWizard">
+
+    <!-- Progress -->
+    <div class="wizard-progress" id="wizardProgress">
+      <div class="wizard-step-dot active" id="dot1">1</div>
+      <div class="wizard-line" id="line1"></div>
+      <div class="wizard-step-dot" id="dot2">2</div>
+      <div class="wizard-line" id="line2"></div>
+      <div class="wizard-step-dot" id="dot3">3</div>
+      <div class="wizard-line" id="line3"></div>
+      <div class="wizard-step-dot" id="dot4">4</div>
     </div>
 
-    <div class="generator-result" id="planResult">
-      <div id="planPlaceholder" class="result-placeholder">
-        <div class="placeholder-icon">📋</div>
-        <h3>Your diet plan will appear here</h3>
-        <p>Select your goal and preferences to generate a personalized Fat Switch meal plan.</p>
+    <!-- ══ STEP 1 — Goal ══ -->
+    <div class="wizard-step active" id="step1">
+      <div class="step-title">What's your main goal?</div>
+      <div class="step-subtitle">This shapes your calorie target and meal balance.</div>
+      <div class="option-grid option-grid-2">
+        <div class="option-card" onclick="selectOption(this, 'goal', 'lose_fat')">
+          <div class="opt-icon">🔥</div>
+          <div class="opt-label">Lose Fat</div>
+          <div class="opt-desc">Calorie deficit, high protein</div>
+        </div>
+        <div class="option-card" onclick="selectOption(this, 'goal', 'maintain')">
+          <div class="opt-icon">⚖️</div>
+          <div class="opt-label">Maintain Weight</div>
+          <div class="opt-desc">Balanced, sustainable eating</div>
+        </div>
+        <div class="option-card" onclick="selectOption(this, 'goal', 'build_muscle')">
+          <div class="opt-icon">💪</div>
+          <div class="opt-label">Build Muscle</div>
+          <div class="opt-desc">Calorie surplus, high protein</div>
+        </div>
+        <div class="option-card" onclick="selectOption(this, 'goal', 'clean_eating')">
+          <div class="opt-icon">🥗</div>
+          <div class="opt-label">Clean Eating</div>
+          <div class="opt-desc">Whole foods, minimal processed</div>
+        </div>
       </div>
-      <div id="planContent" style="display:none;"></div>
-      <div id="planError" style="display:none;"></div>
+      <button class="plan-btn" id="nextBtn1" onclick="nextStep(2)" disabled>Continue →</button>
     </div>
-  </div>
 
-  <% if (plans.length > 0) { %>
-  <div style="margin-top:4rem;">
-    <h2 style="margin-bottom:1.5rem; color:var(--green-dark);">📚 Recent AI-Generated Plans</h2>
-    <div class="grid grid-2">
-      <% plans.forEach(plan => { %>
-        <div class="card">
-          <div class="card-body">
-            <div class="card-category"><%= plan.goal %></div>
-            <h3 class="card-title"><%= plan.name %></h3>
-            <p class="card-desc"><%= plan.description %></p>
-            <div class="card-meta">
-              <span>📅 <%= plan.duration_days %> days</span>
-              <% if (plan.calories_per_day) { %><span>🔥 <%= plan.calories_per_day %> cal/day</span><% } %>
-              <span class="ai-badge">🤖 AI</span>
-            </div>
-          </div>
+    <!-- ══ STEP 2 — Body & Activity ══ -->
+    <div class="wizard-step" id="step2">
+      <div class="step-title">About you</div>
+      <div class="step-subtitle">Used to calculate your daily calorie target.</div>
+
+      <div class="slider-wrap">
+        <div class="slider-label">
+          <span>Current Weight</span>
+          <span class="slider-val"><span id="weightVal">70</span> kg</span>
         </div>
-      <% }) %>
+        <input type="range" id="weightSlider" min="40" max="160" value="70" step="1" oninput="document.getElementById('weightVal').textContent=this.value">
+      </div>
+
+      <div class="slider-wrap">
+        <div class="slider-label">
+          <span>Target Weight</span>
+          <span class="slider-val"><span id="targetVal">65</span> kg</span>
+        </div>
+        <input type="range" id="targetSlider" min="40" max="160" value="65" step="1" oninput="document.getElementById('targetVal').textContent=this.value">
+      </div>
+
+      <div class="step-subtitle" style="margin-top:16px;margin-bottom:10px">Activity Level</div>
+      <div class="option-grid option-grid-3">
+        <div class="option-card" onclick="selectOption(this,'activity','sedentary')">
+          <div class="opt-icon">🛋️</div>
+          <div class="opt-label">Sedentary</div>
+          <div class="opt-desc">Desk job, little exercise</div>
+        </div>
+        <div class="option-card" onclick="selectOption(this,'activity','moderate')">
+          <div class="opt-icon">🚶</div>
+          <div class="opt-label">Moderate</div>
+          <div class="opt-desc">Light exercise 3x/week</div>
+        </div>
+        <div class="option-card" onclick="selectOption(this,'activity','active')">
+          <div class="opt-icon">🏃</div>
+          <div class="opt-label">Active</div>
+          <div class="opt-desc">Exercise 5+ times/week</div>
+        </div>
+      </div>
+      <button class="plan-btn" id="nextBtn2" onclick="nextStep(3)" disabled>Continue →</button>
+      <button class="plan-btn-back" onclick="nextStep(1)">← Back</button>
     </div>
+
+    <!-- ══ STEP 3 — Food Preferences ══ -->
+    <div class="wizard-step" id="step3">
+      <div class="step-title">Food preferences</div>
+      <div class="step-subtitle">Select all that apply.</div>
+      <div class="option-grid option-grid-2">
+        <div class="option-card" onclick="toggleMulti(this,'pref','no_restriction')">
+          <div class="opt-icon">🍽️</div>
+          <div class="opt-label">No restrictions</div>
+          <div class="opt-desc">I eat everything</div>
+        </div>
+        <div class="option-card" onclick="toggleMulti(this,'pref','high_protein')">
+          <div class="opt-icon">🥩</div>
+          <div class="opt-label">High protein</div>
+          <div class="opt-desc">25g+ protein per meal</div>
+        </div>
+        <div class="option-card" onclick="toggleMulti(this,'pref','low_carb')">
+          <div class="opt-icon">🥦</div>
+          <div class="opt-label">Low carb</div>
+          <div class="opt-desc">Under 100g carbs/day</div>
+        </div>
+        <div class="option-card" onclick="toggleMulti(this,'pref','no_dairy')">
+          <div class="opt-icon">🚫</div>
+          <div class="opt-label">Dairy-free</div>
+          <div class="opt-desc">No milk, cheese, butter</div>
+        </div>
+        <div class="option-card" onclick="toggleMulti(this,'pref','vegetarian')">
+          <div class="opt-icon">🌱</div>
+          <div class="opt-label">Vegetarian</div>
+          <div class="opt-desc">No meat or fish</div>
+        </div>
+        <div class="option-card" onclick="toggleMulti(this,'pref','asian_inspired')">
+          <div class="opt-icon">🥢</div>
+          <div class="opt-label">Asian-inspired</div>
+          <div class="opt-desc">Korean, Japanese, Thai</div>
+        </div>
+      </div>
+      <button class="plan-btn" onclick="nextStep(4)">Continue →</button>
+      <button class="plan-btn-back" onclick="nextStep(2)">← Back</button>
+    </div>
+
+    <!-- ══ STEP 4 — Email Gate ══ -->
+    <div class="wizard-step" id="step4">
+      <div class="email-gate">
+        <div style="font-size:2.5rem;margin-bottom:10px">📬</div>
+        <h3>Your plan is ready to generate!</h3>
+        <p>Enter your email to receive your 7-day plan. We'll also send weekly Fat Switch recipe ideas — unsubscribe anytime.</p>
+      </div>
+      <input type="text"  id="planName"  class="plan-input" placeholder="Your first name">
+      <input type="email" id="planEmail" class="plan-input" placeholder="Your email address">
+      <div style="font-family:var(--font-ui);font-size:0.75rem;color:var(--text-light);margin-bottom:16px;text-align:center">
+        🔒 We respect your privacy. No spam, ever. Unsubscribe in one click.
+      </div>
+      <button class="plan-btn" id="generatePlanBtn" onclick="generatePlan()">
+        ⚡ Generate My 7-Day Plan →
+      </button>
+      <button class="plan-btn-back" onclick="nextStep(3)">← Back</button>
+      <div id="planError" style="display:none;color:var(--red);font-family:var(--font-ui);font-size:0.85rem;text-align:center;margin-top:10px"></div>
+    </div>
+
+    <!-- ══ LOADING ══ -->
+    <div class="plan-loading" id="planLoading">
+      <div class="plan-loading-spinner"></div>
+      <p style="font-family:var(--font-display);font-size:1.3rem;font-weight:700;color:var(--forest);margin-bottom:8px">Building your plan…</p>
+      <p style="font-family:var(--font-ui);font-size:0.85rem;color:var(--text-light)" id="loadingMsg">Calculating your calorie target…</p>
+    </div>
+
+  </div><!-- /plan-wizard -->
+
+  <!-- ══ AD SLOT ══ -->
+  <div class="ad-slot" style="max-width:700px;margin:32px auto">
+    <span class="ad-slot-label">Advertisement</span>
+    <span class="ad-slot-size">728×90</span>
   </div>
-  <% } %>
-</div>
 
-<%- include('partials/footer') %>
+  <!-- ══ RESULTS ══ -->
+  <div class="plan-result" id="planResult" style="max-width:700px;margin:0 auto 80px">
 
-<% extraScripts = `
+    <div class="plan-result-header">
+      <div style="font-size:2.5rem">📋</div>
+      <div class="plan-result-header-info">
+        <div class="plan-result-title" id="resultTitle">Your 7-Day Fat Switch Plan</div>
+        <div class="plan-result-stats" id="resultStats"></div>
+      </div>
+    </div>
+
+    <!-- Day-by-day accordion -->
+    <div id="planDays"></div>
+
+    <!-- Share strip -->
+    <div style="background:var(--cream-dark);border-radius:var(--radius);padding:20px 24px;margin-top:24px">
+      <p style="font-family:var(--font-ui);font-weight:600;font-size:0.88rem;color:var(--forest);margin-bottom:12px">📤 Share your plan</p>
+      <div class="share-strip">
+        <button class="share-btn" onclick="copyLink()">🔗 Copy Link</button>
+        <button class="share-btn" onclick="shareTwitter()">𝕏 Share on X</button>
+        <button class="share-btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+      </div>
+    </div>
+
+    <!-- Try a recipe CTA -->
+    <div style="background:var(--forest);border-radius:var(--radius-lg);padding:28px 32px;margin-top:24px;text-align:center">
+      <h3 style="color:var(--cream);margin-bottom:8px">Want specific recipes for your plan?</h3>
+      <p style="color:rgba(250,247,240,0.7);font-size:0.9rem;margin-bottom:20px">Generate any meal idea from your plan as a full Fat Switch recipe — with ingredients, steps, and nutrition.</p>
+      <a href="/generator" class="btn btn-primary">⚡ Generate a Recipe →</a>
+    </div>
+
+    <!-- AD SLOT RESULTS -->
+    <div class="ad-slot" style="margin-top:24px">
+      <span class="ad-slot-label">Advertisement</span>
+      <span class="ad-slot-size">728×90</span>
+    </div>
+
+  </div>
+
+</div><!-- /page-wrap -->
+
 <script>
-const form = document.getElementById('planForm');
-const btn = document.getElementById('planBtn');
-const placeholder = document.getElementById('planPlaceholder');
-const planContent = document.getElementById('planContent');
-const planError = document.getElementById('planError');
+// ── Wizard state ──
+const state = { goal: null, activity: null, prefs: [], weight: 70, target: 65, name: '', email: '' };
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const formData = new FormData(form);
-  const restrictions = [...document.querySelectorAll('input[name="restrictions"]:checked')].map(el => el.value);
+function selectOption(el, field, val) {
+  el.closest('.option-grid').querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state[field] = val;
+  // Enable next button for that step
+  if (field === 'goal')     document.getElementById('nextBtn1').disabled = false;
+  if (field === 'activity') document.getElementById('nextBtn2').disabled = false;
+}
 
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Creating Your Plan...';
-  placeholder.style.display = 'none';
-  planContent.style.display = 'none';
-  planError.style.display = 'none';
+function toggleMulti(el, field, val) {
+  el.classList.toggle('selected');
+  if (el.classList.contains('selected')) {
+    if (!state.prefs.includes(val)) state.prefs.push(val);
+  } else {
+    state.prefs = state.prefs.filter(v => v !== val);
+  }
+}
+
+function nextStep(n) {
+  document.querySelectorAll('.wizard-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+
+  // Update progress dots
+  for (let i = 1; i <= 4; i++) {
+    const dot  = document.getElementById('dot' + i);
+    const line = document.getElementById('line' + i);
+    dot.classList.remove('active', 'done');
+    if (line) line.classList.remove('done');
+    if (i < n)  { dot.classList.add('done'); if (line) line.classList.add('done'); }
+    if (i === n) dot.classList.add('active');
+  }
+}
+
+// ── Generate plan via API ──
+async function generatePlan() {
+  state.name  = document.getElementById('planName').value.trim();
+  state.email = document.getElementById('planEmail').value.trim();
+  state.weight = parseInt(document.getElementById('weightSlider').value);
+  state.target = parseInt(document.getElementById('targetSlider').value);
+
+  const errEl = document.getElementById('planError');
+  errEl.style.display = 'none';
+
+  if (!state.name) { errEl.textContent = '⚠️ Please enter your first name.'; errEl.style.display = 'block'; return; }
+  if (!state.email || !state.email.includes('@')) { errEl.textContent = '⚠️ Please enter a valid email.'; errEl.style.display = 'block'; return; }
+  if (!state.goal) { errEl.textContent = '⚠️ Please go back and select a goal.'; errEl.style.display = 'block'; return; }
+
+  // Hide form, show loading
+  document.getElementById('wizardProgress').style.display = 'none';
+  document.querySelectorAll('.wizard-step').forEach(s => s.style.display = 'none');
+  document.getElementById('planLoading').style.display = 'block';
+
+  const msgs = [
+    'Calculating your calorie target…',
+    'Planning your breakfast options…',
+    'Building lunch and dinner ideas…',
+    'Adding Fat Switch swaps…',
+    'Finalising your 7-day schedule…'
+  ];
+  let mi = 0;
+  const msgInterval = setInterval(() => {
+    if (mi < msgs.length) document.getElementById('loadingMsg').textContent = msgs[mi++];
+  }, 2000);
 
   try {
-    const res = await fetch('/api/generate-diet-plan', {
-      method: 'POST',
+    const res  = await fetch('/api/generate-plan', {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        goal: formData.get('goal'),
-        duration: formData.get('duration'),
-        calories: formData.get('calories'),
-        restrictions,
-      }),
+      body:    JSON.stringify(state)
     });
     const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Generation failed');
+    clearInterval(msgInterval);
 
-    const p = data.plan;
-    const daysHtml = p.meal_plan.map(day => \`
-      <div class="day-card">
-        <div class="day-header">Day \${day.day}</div>
-        <div class="day-meals">
-          \${['breakfast','lunch','dinner','snack'].map(m => day[m] ? \`
-            <div class="meal-item">
-              <div class="meal-type">\${m}</div>
-              <div class="meal-name">\${day[m].name}</div>
-              <div class="meal-cal">\${day[m].calories} cal · \${day[m].notes || ''}</div>
-            </div>
-          \` : '').join('')}
+    if (!res.ok || !data.plan) {
+      showPlanError(data.error || 'Generation failed. Please try again.');
+      return;
+    }
+
+    renderPlan(data.plan, state.name);
+
+  } catch(err) {
+    clearInterval(msgInterval);
+    showPlanError('Network error. Please try again.');
+  }
+}
+
+function showPlanError(msg) {
+  document.getElementById('planLoading').style.display = 'none';
+  document.getElementById('wizardProgress').style.display = 'flex';
+  document.querySelectorAll('.wizard-step').forEach(s => s.style.display = '');
+  nextStep(4);
+  const errEl = document.getElementById('planError');
+  errEl.textContent = '⚠️ ' + msg;
+  errEl.style.display = 'block';
+}
+
+function renderPlan(plan, name) {
+  document.getElementById('planLoading').style.display = 'none';
+  document.getElementById('planWizard').style.display  = 'none';
+  document.getElementById('planResult').style.display  = 'block';
+
+  document.getElementById('resultTitle').textContent =
+    name + "'s 7-Day Fat Switch Plan";
+
+  document.getElementById('resultStats').innerHTML = `
+    <span>🎯 Goal: <strong>${formatGoal(state.goal)}</strong></span>
+    <span>🔥 Daily Target: <strong>${plan.daily_calories} kcal</strong></span>
+    <span>🥩 Protein: <strong>${plan.daily_protein}g/day</strong></span>
+    <span>📅 <strong>7 days</strong></span>
+  `;
+
+  const daysContainer = document.getElementById('planDays');
+  daysContainer.innerHTML = '';
+
+  plan.days.forEach((day, i) => {
+    const el = document.createElement('div');
+    el.className = 'day-card';
+    el.innerHTML = `
+      <div class="day-header" onclick="this.closest('.day-card').classList.toggle('open')">
+        <div class="day-num">${i+1}</div>
+        <div class="day-title">Day ${i+1} — ${day.theme || ''}</div>
+        <div class="day-kcal">~${day.total_kcal || '—'} kcal</div>
+        <div class="day-toggle">+</div>
+      </div>
+      <div class="day-body">
+        <div class="day-body-inner">
+          ${renderMeals(day.meals)}
+          ${day.tip ? `<div style="background:#FFF8E1;border-left:3px solid var(--gold);padding:10px 14px;margin-top:12px;border-radius:0 var(--radius) var(--radius) 0;font-size:0.85rem;color:#5D4037">💡 <strong>Day Tip:</strong> ${day.tip}</div>` : ''}
         </div>
       </div>
-    \`).join('');
+    `;
+    daysContainer.appendChild(el);
+    // Auto-open first day
+    if (i === 0) el.classList.add('open');
+  });
+}
 
-    planContent.innerHTML = \`
-      <div class="alert alert-success">✅ Your plan is ready!</div>
-      <h2 style="margin-bottom:0.5rem; color:var(--green-dark);">\${p.name}</h2>
-      <p style="color:var(--gray-600); margin-bottom:1rem;">\${p.description}</p>
-      <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;">
-        <span>📅 \${p.duration_days} days</span>
-        \${p.calories_per_day ? \`<span>🔥 ~\${p.calories_per_day} cal/day</span>\` : ''}
-        <span>🎯 \${p.goal}</span>
+function renderMeals(meals) {
+  if (!meals || !meals.length) return '';
+  return meals.map(m => `
+    <div class="meal-row">
+      <div class="meal-label">${m.type || 'Meal'}</div>
+      <div class="meal-content">
+        <div class="meal-name">${m.name}</div>
+        ${m.description ? `<div class="meal-detail">${m.description}</div>` : ''}
+        ${m.fat_switch_tip ? `<div class="meal-detail" style="color:var(--amber)">⚡ ${m.fat_switch_tip}</div>` : ''}
       </div>
-      \${daysHtml}
-    \`;
-    planContent.style.display = 'block';
-  } catch (err) {
-    planError.innerHTML = \`<div class="alert alert-error">❌ \${err.message}</div>\`;
-    planError.style.display = 'block';
-    placeholder.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '📋 Generate My Plan';
-  }
-});
+      <div class="meal-kcal">${m.kcal ? m.kcal+' kcal' : ''}</div>
+    </div>
+  `).join('');
+}
+
+function formatGoal(g) {
+  const map = { lose_fat:'Fat Loss', maintain:'Maintain Weight', build_muscle:'Build Muscle', clean_eating:'Clean Eating' };
+  return map[g] || g;
+}
+
+function copyLink() {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    document.querySelectorAll('.share-btn')[0].textContent = '✅ Copied!';
+    setTimeout(() => document.querySelectorAll('.share-btn')[0].textContent = '🔗 Copy Link', 2000);
+  });
+}
+
+function shareTwitter() {
+  const text = encodeURIComponent('Just generated my FREE 7-Day Fat Switch Meal Plan on FatSwitchDiet! 🔥 Same great food, fewer calories. Try it:');
+  window.open('https://twitter.com/intent/tweet?text=' + text + '&url=' + encodeURIComponent(window.location.href), '_blank');
+}
 </script>
-`; %>
+
+<%- include('partials/footer') %>
