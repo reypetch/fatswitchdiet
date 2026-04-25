@@ -72,7 +72,7 @@ const placeholder = document.getElementById('placeholder');
 const resultContent = document.getElementById('resultContent');
 const errorArea = document.getElementById('errorArea');
 
-form.addEventListener('submit', async (e) => {
+if (form) form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const formData = new FormData(form);
   const dietary = [...document.querySelectorAll('input[name="dietary"]:checked')].map(el => el.value);
