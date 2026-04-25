@@ -31,12 +31,12 @@ function formatDate(iso) {
 }
 
 // ── CLAUDE PROMPT ────────────────────────────────────────────
-function buildPrompt(keyword, cuisine, dietary) {
+function buildPrompt(keyword, category, dietary) {
   return `You are a professional nutritionist and recipe developer for FatSwitchDiet.com.
 Your specialty is creating indulgent international recipes alongside a "Fat Switch" — smart ingredient swaps that cut 30–45% of calories while preserving full flavor.
 
 Generate a complete recipe for: "${keyword}"
-Cuisine preference: ${cuisine || 'Any international cuisine'}
+Meal category: ${category || 'Any'}
 Dietary note: ${dietary || 'None'}
 
 Return ONLY valid JSON. No markdown. No backticks. No preamble. Exact structure below:
@@ -151,7 +151,7 @@ app.get('/diet-plan',      (req, res) => res.render('diet-plan', { categories: d
 // ── POST /api/generate ────────────────────────────────────────
 // FIX: Only saves to DB when valid adminKey is provided in request body
 app.post('/api/generate', async (req, res) => {
-  const { keyword, cuisine, dietary, adminKey } = req.body;
+  const { keyword, category, dietary, adminKey } = req.body;
 
   if (!keyword || keyword.trim().length < 2) {
     return res.status(400).json({ error: 'Please enter a recipe keyword.' });
@@ -166,7 +166,7 @@ app.post('/api/generate', async (req, res) => {
       max_tokens: 4096,
       messages: [{
         role:    'user',
-        content: buildPrompt(keyword.trim(), cuisine, dietary)
+        content: buildPrompt(keyword.trim(), category, dietary)
       }]
     });
 

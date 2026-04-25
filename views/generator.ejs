@@ -256,19 +256,14 @@
 
       <div class="gen-options">
         <div>
-          <label style="display:block;font-family:var(--font-ui);font-size:0.78rem;font-weight:600;color:var(--text-light);margin-bottom:5px">CUISINE (optional)</label>
-          <select id="genCuisine" class="gen-select">
-            <option value="">Any cuisine</option>
-            <option>Italian</option>
-            <option>Japanese</option>
-            <option>Korean</option>
-            <option>Thai</option>
-            <option>Chinese</option>
-            <option>Indian</option>
-            <option>Mexican</option>
-            <option>American</option>
-            <option>Mediterranean</option>
-            <option>French</option>
+          <label style="display:block;font-family:var(--font-ui);font-size:0.78rem;font-weight:600;color:var(--text-light);margin-bottom:5px">CATEGORY (optional)</label>
+          <select id="genCategory" class="gen-select">
+            <option value="">Any category</option>
+            <option>Breakfast</option>
+            <option>Lunch</option>
+            <option>Dinner</option>
+            <option>Snack</option>
+            <option>Dessert</option>
           </select>
         </div>
         <div>
@@ -415,7 +410,7 @@ function getCuisineEmoji(cuisine) {
 // ── Generate Recipe ──
 async function generateRecipe() {
   const keyword = document.getElementById('genKeyword').value.trim();
-  const cuisine = document.getElementById('genCuisine').value;
+  const category = document.getElementById('genCategory').value;
   const dietary = document.getElementById('genDietary').value;
   const errEl   = document.getElementById('genError');
 
@@ -445,7 +440,7 @@ async function generateRecipe() {
 
   try {
     // FIX: Include adminKey in request body if in admin mode
-    const payload = { keyword, cuisine, dietary };
+    const payload = { keyword, category, dietary };
     if (IS_ADMIN) payload.adminKey = ADMIN_KEY;
 
     const res  = await fetch('/api/generate', {
