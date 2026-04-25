@@ -108,7 +108,7 @@ app.get('/', (req, res) => {
   const featured   = db.getFeaturedRecipes();
   const recent     = db.getRecentRecipes();
   const total      = db.getTotalCount();
-  res.render('index', { categories, featured, recent, recipes: recent, total, formatDate });
+  res.render('index', { categories, featured, recent, recipes: recent, total, formatDate, page: 'home' });
 });
 
 // ── Generator Page ───────────────────────────────────────────
