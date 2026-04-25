@@ -1,391 +1,137 @@
-<%
-  pageTitle    = 'AI Recipe Generator — FatSwitchDiet';
-  metaDesc     = 'Generate any recipe instantly with the Fat Switch — our AI creates a full recipe with calorie comparison and healthy swaps in seconds.';
-  canonicalUrl = '/generator';
-%>
-<%- include('partials/header') %>
+<%- include('partials/header', { title: 'AI Recipe Generator' }) %>
 
-<style>
-.gen-hero {
-  background: var(--forest);
-  padding: 60px 24px 80px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-.gen-hero::before {
-  content: '⚡';
-  position: absolute;
-  font-size: 18rem;
-  opacity: 0.04;
-  top: -40px;
-  left: 50%;
-  transform: translateX(-50%);
-  line-height: 1;
-}
-.gen-card {
-  background: var(--white);
-  border-radius: var(--radius-lg);
-  padding: 40px;
-  max-width: 680px;
-  margin: -40px auto 0;
-  position: relative;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-  border: 1px solid var(--border);
-}
-.gen-input-main {
-  width: 100%;
-  border: 2.5px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 20px;
-  font-family: var(--font-body);
-  font-size: 1.1rem;
-  color: var(--text);
-  outline: none;
-  transition: border-color 0.2s;
-  margin-bottom: 16px;
-}
-.gen-input-main:focus { border-color: var(--forest); }
-.gen-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.gen-select {
-  width: 100%;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px 14px;
-  font-family: var(--font-ui);
-  font-size: 0.88rem;
-  color: var(--text);
-  background: var(--white);
-  outline: none;
-  cursor: pointer;
-}
-.gen-select:focus { border-color: var(--forest); }
-.gen-btn {
-  width: 100%;
-  background: var(--forest);
-  color: var(--cream);
-  border: none;
-  border-radius: var(--radius);
-  padding: 16px;
-  font-family: var(--font-ui);
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.25s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-.gen-btn:hover:not(:disabled) {
-  background: var(--amber);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(30,58,47,0.25);
-}
-.gen-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+<div class="container section">
+  <div class="text-center mb-4">
+    <h1 style="font-size:2.5rem; color:var(--green-dark);">✨ AI Recipe Generator</h1>
+    <p style="font-size:1.15rem; color:var(--gray-600); max-width:550px; margin:0.75rem auto 0;">Describe what you're craving and Claude AI will create a personalized, nutritionist-approved recipe just for you.</p>
+  </div>
 
-/* Loading state */
-.gen-loading {
-  display: none;
-  text-align: center;
-  padding: 40px 20px;
-}
-.gen-loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid var(--border);
-  border-top-color: var(--forest);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto 16px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.gen-loading-steps {
-  list-style: none;
-  font-family: var(--font-ui);
-  font-size: 0.88rem;
-  color: var(--text-light);
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.gen-loading-steps li { transition: color 0.3s; }
-.gen-loading-steps li.active { color: var(--forest); font-weight: 600; }
-.gen-loading-steps li.done { color: var(--amber); }
-.gen-loading-steps li.done::before { content: '✓ '; }
-
-/* Error */
-.gen-error {
-  display: none;
-  background: #FFF5F5;
-  border: 1px solid #FED7D7;
-  border-radius: var(--radius);
-  padding: 14px 18px;
-  color: #C53030;
-  font-family: var(--font-ui);
-  font-size: 0.88rem;
-  margin-top: 12px;
-}
-
-/* Recent recipes mini list */
-.recent-list { list-style: none; }
-.recent-list li {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 0.9rem;
-}
-.recent-list li:last-child { border-bottom: none; }
-.recent-list a { color: var(--forest) !important; font-weight: 600; }
-.recent-badge {
-  font-family: var(--font-ui);
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: var(--cream-dark);
-  color: var(--text-mid);
-  white-space: nowrap;
-}
-</style>
-
-<!-- ══ GENERATOR HERO ══ -->
-<div class="gen-hero">
-  <p style="font-family:var(--font-ui);font-size:0.78rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--amber-light);margin-bottom:12px">AI-Powered ✦ FatSwitchDiet</p>
-  <h1 style="color:var(--cream);font-size:clamp(1.8rem,5vw,3rem);margin-bottom:12px">Generate Any Recipe.<br>Instantly.</h1>
-  <p style="color:rgba(250,247,240,0.7);font-size:1rem;max-width:480px;margin:0 auto">Type any dish — our AI creates a complete Fat Switch recipe with nutrition comparison, ingredient swaps, and a live SEO page.</p>
-</div>
-
-<div class="page-wrap">
-
-  <!-- ══ GENERATOR CARD ══ -->
-  <div class="gen-card">
-
-    <!-- Form -->
-    <div id="genForm">
-      <label style="display:block;font-family:var(--font-ui);font-size:0.82rem;font-weight:600;color:var(--text);margin-bottom:6px;letter-spacing:0.03em">
-        RECIPE NAME OR KEYWORD *
-      </label>
-      <input
-        type="text"
-        id="genKeyword"
-        class="gen-input-main"
-        placeholder="e.g. Creamy Chicken Alfredo, Pad Thai, Chocolate Lava Cake…"
-        maxlength="80"
-        autocomplete="off"
-      >
-
-      <div class="gen-options">
-        <div>
-          <label style="display:block;font-family:var(--font-ui);font-size:0.78rem;font-weight:600;color:var(--text-light);margin-bottom:5px">CATEGORY (optional)</label>
-          <select id="genCuisine" class="gen-select">
+  <div class="generator-layout">
+    <div class="generator-form-card">
+      <h2 style="margin-bottom:1.5rem; color:var(--green-dark);">Customize Your Recipe</h2>
+      <form id="generatorForm">
+        <div class="form-group">
+          <label class="form-label" for="prompt">What would you like to eat? *</label>
+          <textarea class="form-control" id="prompt" name="prompt" rows="3" placeholder="e.g. High protein breakfast with eggs and avocado, or a creamy pasta that's low carb..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="category">Category</label>
+          <select class="form-control" id="category" name="category">
             <option value="">Any category</option>
-            <option>Breakfast</option>
-            <option>Desserts</option>
-            <option>Dinner</option>
-            <option>High Protein</option>
-            <option>Low Carb</option>
-            <option>Lunch</option>
-            <option>Smoothies</option>
-            <option>Snacks</option>
+            <% categories.forEach(cat => { %>
+              <option value="<%= cat.name %>"><%= cat.icon %> <%= cat.name %></option>
+            <% }) %>
           </select>
         </div>
-        <div>
-          <label style="display:block;font-family:var(--font-ui);font-size:0.78rem;font-weight:600;color:var(--text-light);margin-bottom:5px">DIETARY NOTE (optional)</label>
-          <select id="genDietary" class="gen-select">
-            <option value="">None</option>
-            <option>Low carb</option>
-            <option>High protein</option>
-            <option>Gluten-free</option>
-            <option>Dairy-free</option>
-            <option>Vegetarian</option>
-            <option>Keto-friendly</option>
+        <div class="form-group">
+          <label class="form-label" for="servings">Servings</label>
+          <select class="form-control" id="servings" name="servings">
+            <option value="1">1 serving</option>
+            <option value="2">2 servings</option>
+            <option value="4" selected>4 servings</option>
+            <option value="6">6 servings</option>
           </select>
         </div>
-      </div>
-
-      <button class="gen-btn" id="genBtn" onclick="generateRecipe()">
-        <span>⚡</span> Generate Fat Switch Recipe
-      </button>
-      <div class="gen-error" id="genError"></div>
-
-      <p style="text-align:center;font-family:var(--font-ui);font-size:0.75rem;color:var(--text-light);margin-top:14px">
-        Takes ~10–15 seconds · Creates a full SEO page · Free to use
-      </p>
+        <div class="form-group">
+          <label class="form-label">Dietary Preferences</label>
+          <div class="form-check">
+            <% ['Vegan', 'Vegetarian', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Paleo', 'Low-Carb', 'High-Protein'].forEach(d => { %>
+              <label class="form-check-item">
+                <input type="checkbox" name="dietary" value="<%= d %>">
+                <%= d %>
+              </label>
+            <% }) %>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-orange btn-lg" style="width:100%; justify-content:center;" id="generateBtn">
+          ✨ Generate Recipe
+        </button>
+        <p style="text-align:center; font-size:0.8rem; color:var(--gray-600); margin-top:0.75rem;">Powered by Claude AI · Takes ~10 seconds</p>
+      </form>
     </div>
 
-    <!-- Loading state -->
-    <div class="gen-loading" id="genLoading">
-      <div class="gen-loading-spinner"></div>
-      <p style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--forest)" id="loadingTitle">Creating your recipe…</p>
-      <ul class="gen-loading-steps" id="loadingSteps">
-        <li id="step1" class="active">🧠 Analysing recipe and cuisine…</li>
-        <li id="step2">🔄 Finding the best Fat Switch swaps…</li>
-        <li id="step3">📊 Calculating nutrition comparison…</li>
-        <li id="step4">📝 Writing instructions and tips…</li>
-        <li id="step5">✅ Saving and creating your page…</li>
-      </ul>
-    </div>
-
-  </div>
-
-  <!-- ══ AD SLOT ══ -->
-  <div class="ad-slot" style="max-width:680px;margin:32px auto">
-    <span class="ad-slot-label">Advertisement</span>
-    <span class="ad-slot-size">728×90</span>
-  </div>
-
-  <!-- ══ HOW IT WORKS ══ -->
-  <div style="max-width:680px;margin:0 auto 48px">
-    <h2 style="text-align:center;margin-bottom:32px">How It Works</h2>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;text-align:center">
-      <div style="padding:20px">
-        <div style="font-size:2.5rem;margin-bottom:10px">⌨️</div>
-        <strong style="font-family:var(--font-ui);font-size:0.88rem;color:var(--forest)">1. Type a dish name</strong>
-        <p style="font-size:0.85rem;color:var(--text-mid);margin-top:6px">Any recipe, any cuisine — our AI knows them all.</p>
+    <div class="generator-result" id="resultArea">
+      <div class="result-placeholder" id="placeholder">
+        <div class="placeholder-icon">🍽️</div>
+        <h3 style="margin-bottom:0.5rem; color:var(--gray-800);">Your recipe will appear here</h3>
+        <p>Fill in the form and click Generate to create your personalized fat-switching recipe.</p>
       </div>
-      <div style="padding:20px">
-        <div style="font-size:2.5rem;margin-bottom:10px">⚡</div>
-        <strong style="font-family:var(--font-ui);font-size:0.88rem;color:var(--forest)">2. AI generates everything</strong>
-        <p style="font-size:0.85rem;color:var(--text-mid);margin-top:6px">Full recipe + Fat Switch swaps + nutrition in ~15 seconds.</p>
-      </div>
-      <div style="padding:20px">
-        <div style="font-size:2.5rem;margin-bottom:10px">🔗</div>
-        <strong style="font-family:var(--font-ui);font-size:0.88rem;color:var(--forest)">3. Live SEO page created</strong>
-        <p style="font-size:0.85rem;color:var(--text-mid);margin-top:6px">Your recipe gets its own URL, shareable and indexed by Google.</p>
-      </div>
+      <div id="resultContent" style="display:none;"></div>
+      <div id="errorArea" style="display:none;"></div>
     </div>
   </div>
-
-  <!-- ══ RECENTLY GENERATED ══ -->
-  <div style="max-width:680px;margin:0 auto 60px">
-    <h2 style="margin-bottom:16px">Recently Generated</h2>
-    <div id="recentRecipes" style="background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--border);padding:8px 20px">
-      <p style="color:var(--text-light);font-size:0.9rem;text-align:center;padding:20px 0">Loading recent recipes…</p>
-    </div>
-  </div>
-
 </div>
-
-<script>
-const IS_ADMIN = new URLSearchParams(window.location.search).get('admin') === 'fatswitchdev2026';
-
-// ── Load recent recipes on page load ──
-(async function loadRecent() {
-  try {
-    const res  = await fetch('/api/recipes');
-    const data = await res.json();
-    const container = document.getElementById('recentRecipes');
-    if (!data.length) {
-      container.innerHTML = '<p style="color:var(--text-light);font-size:0.9rem;text-align:center;padding:20px 0">No recipes yet — generate the first one!</p>';
-      return;
-    }
-    container.innerHTML = `<ul class="recent-list">
-      ${data.slice(0, 8).map(r => `
-        <li>
-          <span style="font-size:1.2rem">${getCuisineEmoji(r.cuisine)}</span>
-          <a href="/recipe/${r.slug}">${r.title}</a>
-          <span class="recent-badge">${r.category}</span>
-          ${r.savings_pct ? `<span class="recent-badge" style="background:#EBF5ED;color:#155724">↓${r.savings_pct}% kcal</span>` : ''}
-        </li>
-      `).join('')}
-    </ul>`;
-  } catch(e) {
-    console.error(e);
-  }
-})();
-
-function getCuisineEmoji(cuisine) {
-  const map = { Japanese:'🍱', Korean:'🥢', Thai:'🍜', Italian:'🍝', Chinese:'🥟', Indian:'🍛', Mexican:'🌮', French:'🥐', American:'🍔', Mediterranean:'🫒' };
-  return map[cuisine] || '🍽️';
-}
-
-// ── Generate Recipe ──
-async function generateRecipe() {
-  const keyword = document.getElementById('genKeyword').value.trim();
-  const cuisine = document.getElementById('genCuisine').value;
-  const dietary = document.getElementById('genDietary').value;
-  const errEl   = document.getElementById('genError');
-
-  errEl.style.display = 'none';
-
-  if (!keyword) {
-    errEl.textContent = '⚠️ Please enter a recipe name or keyword.';
-    errEl.style.display = 'block';
-    document.getElementById('genKeyword').focus();
-    return;
-  }
-
-  // Show loading
-  document.getElementById('genForm').style.display    = 'none';
-  document.getElementById('genLoading').style.display = 'block';
-
-  // Animate loading steps
-  const steps    = ['step1','step2','step3','step4','step5'];
-  let stepIndex  = 0;
-  const stepInterval = setInterval(() => {
-    if (stepIndex > 0) document.getElementById(steps[stepIndex - 1]).classList.replace('active', 'done');
-    if (stepIndex < steps.length) {
-      document.getElementById(steps[stepIndex]).classList.add('active');
-      stepIndex++;
-    }
-  }, 2500);
-
-  try {
-    const res  = await fetch('/api/generate', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ keyword, cuisine, dietary, ...(IS_ADMIN && {adminKey:'fatswitchdev2026'}) })
-    });
-    const data = await res.json();
-
-    clearInterval(stepInterval);
-
-    if (!res.ok || !data.success) {
-      showError(data.error || 'Generation failed. Please try again.');
-      return;
-    }
-
-    // Mark all steps done
-    steps.forEach(s => {
-      const el = document.getElementById(s);
-      el.classList.remove('active');
-      el.classList.add('done');
-    });
-
-    document.getElementById('loadingTitle').textContent = '✅ Recipe created!';
-
-    if (IS_ADMIN && data.slug) {
-      window.location.href = '/recipe/' + data.slug;
-    } else {
-      alert('✅ ' + data.title + ' — Fat Switch generated!');
-    }
-
-  } catch (err) {
-    clearInterval(stepInterval);
-    showError('Network error. Please check your connection and try again.');
-  }
-}
-
-function showError(msg) {
-  document.getElementById('genLoading').style.display = 'none';
-  document.getElementById('genForm').style.display    = 'block';
-  const errEl = document.getElementById('genError');
-  errEl.textContent  = '⚠️ ' + msg;
-  errEl.style.display = 'block';
-}
-
-// Enter key trigger
-document.getElementById('genKeyword').addEventListener('keydown', e => {
-  if (e.key === 'Enter') generateRecipe();
-});
-</script>
 
 <%- include('partials/footer') %>
+
+<% extraScripts = `
+<script>
+const form = document.getElementById('generatorForm');
+const btn = document.getElementById('generateBtn');
+const placeholder = document.getElementById('placeholder');
+const resultContent = document.getElementById('resultContent');
+const errorArea = document.getElementById('errorArea');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const formData = new FormData(form);
+  const dietary = [...document.querySelectorAll('input[name="dietary"]:checked')].map(el => el.value);
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating...';
+  placeholder.style.display = 'none';
+  resultContent.style.display = 'none';
+  errorArea.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/generate-recipe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: formData.get('prompt'),
+        category: formData.get('category'),
+        servings: formData.get('servings'),
+        dietary,
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) throw new Error(data.error || 'Generation failed');
+
+    const r = data.recipe;
+    const totalTime = (r.prep_time || 0) + (r.cook_time || 0);
+    resultContent.innerHTML = \`
+      <div class="alert alert-success">✅ Recipe generated and saved!</div>
+      <h2 style="margin-bottom:0.5rem; color:var(--green-dark);">\${r.title}</h2>
+      <p style="color:var(--gray-600); margin-bottom:1rem;">\${r.description}</p>
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;">
+        \${totalTime ? \`<span>⏱ \${totalTime} min</span>\` : ''}
+        \${r.calories ? \`<span>🔥 \${r.calories} cal</span>\` : ''}
+        \${r.protein ? \`<span>💪 \${r.protein}g protein</span>\` : ''}
+        \${r.carbs ? \`<span>🌾 \${r.carbs}g carbs</span>\` : ''}
+        \${r.fat ? \`<span>🥑 \${r.fat}g fat</span>\` : ''}
+      </div>
+      <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">🛒 Ingredients</h3>
+      <ul style="list-style:none; margin-bottom:1.5rem;">
+        \${r.ingredients.map(i => \`<li style="padding:0.4rem 0; border-bottom:1px solid var(--gray-100);">✓ \${i}</li>\`).join('')}
+      </ul>
+      <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">👨‍🍳 Instructions</h3>
+      <ol style="padding-left:1.25rem;">
+        \${r.instructions.map(s => \`<li style="padding:0.4rem 0;">\${s}</li>\`).join('')}
+      </ol>
+      <div style="margin-top:1.5rem;">
+        <a href="/recipe/\${r.slug}" class="btn btn-primary">View Full Recipe →</a>
+      </div>
+    \`;
+    resultContent.style.display = 'block';
+  } catch (err) {
+    errorArea.innerHTML = \`<div class="alert alert-error">❌ \${err.message}</div>\`;
+    errorArea.style.display = 'block';
+    placeholder.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✨ Generate Recipe';
+  }
+});
+</script>
+`; %>
