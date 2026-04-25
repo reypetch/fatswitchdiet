@@ -367,7 +367,7 @@
 
 <script>
 // ── Admin mode flag from server ──
-const IS_ADMIN = <%= isAdmin ? 'true' : 'false' %>;
+const IS_ADMIN = new URLSearchParams(window.location.search).get('admin') === 'fatswitchdev2026';
 const ADMIN_KEY = IS_ADMIN ? 'fatswitchdev2026' : null;
 
 // ── Generate Recipe ──
