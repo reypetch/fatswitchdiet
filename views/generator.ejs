@@ -275,6 +275,8 @@
 </div>
 
 <script>
+const IS_ADMIN = new URLSearchParams(window.location.search).get('admin') === 'fatswitchdev2026';
+
 // ── Load recent recipes on page load ──
 (async function loadRecent() {
   try {
@@ -340,7 +342,7 @@ async function generateRecipe() {
     const res  = await fetch('/api/generate', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ keyword, cuisine, dietary })
+      body:    JSON.stringify({ keyword, cuisine, dietary, ...(IS_ADMIN && {adminKey:'fatswitchdev2026'}) })
     });
     const data = await res.json();
 
@@ -360,9 +362,11 @@ async function generateRecipe() {
 
     document.getElementById('loadingTitle').textContent = '✅ Recipe created!';
 
-    setTimeout(() => {
+    if (IS_ADMIN && data.slug) {
       window.location.href = '/recipe/' + data.slug;
-    }, 800);
+    } else {
+      alert('✅ ' + data.title + ' — Fat Switch generated!');
+    }
 
   } catch (err) {
     clearInterval(stepInterval);

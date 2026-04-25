@@ -168,17 +168,21 @@ app.post('/api/generate', async (req, res) => {
     }
 
     const slug = makeSlug(data.title);
+    const isAdmin = req.body.adminKey === 'fatswitchdev2026';
 
-    db.saveRecipe({
-      slug,
-      title:   data.title,
-      category: data.category || 'Dinner',
-      cuisine:  data.cuisine  || 'International',
-      keyword:  keyword.trim(),
-      data
-    });
+    if (isAdmin) {
+      db.saveRecipe({
+        slug,
+        title:   data.title,
+        category: data.category || 'Dinner',
+        cuisine:  data.cuisine  || 'International',
+        keyword:  keyword.trim(),
+        data
+      });
+      return res.json({ success: true, slug, title: data.title });
+    }
 
-    res.json({ success: true, slug, title: data.title });
+    res.json({ success: true, slug: null, data, savedToDB: false });
 
   } catch (err) {
     console.error('Generate error:', err.message);
