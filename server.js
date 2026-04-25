@@ -120,14 +120,46 @@ app.get('/generator', (req, res) => {
 app.get('/recipe/:slug', (req, res) => {
   const recipe = db.getRecipe(req.params.slug);
   if (!recipe) return res.status(404).render('404', { page: '404', categories: db.getCategories() });
+
+  // Flatten data JSON fields onto recipe for template compatibility
+  if (recipe.data) {
+    Object.assign(recipe, recipe.data);
+    // Flatten ingredients: { main, filling_or_sauce } → flat array
+    if (recipe.ingredients && !Array.isArray(recipe.ingredients)) {
+      recipe.ingredients = [
+        ...(Array.isArray(recipe.ingredients.main)             ? recipe.ingredients.main             : []),
+        ...(Array.isArray(recipe.ingredients.filling_or_sauce) ? recipe.ingredients.filling_or_sauce : []),
+      ];
+    }
+    // Flatten instructions: [{ title, detail }] → ["Title: detail"]
+    if (Array.isArray(recipe.instructions)) {
+      recipe.instructions = recipe.instructions.map(s =>
+        typeof s === 'string' ? s : `${s.title}: ${s.detail}`
+      );
+    }
+    // Pull nutrition into top-level fields
+    if (!recipe.calories && recipe.nutrition?.switched) {
+      recipe.calories = recipe.nutrition.switched.calories;
+      recipe.protein  = recipe.nutrition.switched.protein;
+      recipe.carbs    = recipe.nutrition.switched.carbs;
+      recipe.fat      = recipe.nutrition.switched.fat;
+    }
+  }
+  // category_name / category_slug for breadcrumb
+  recipe.category_name = recipe.category_name || recipe.category;
+  recipe.category_slug = recipe.category_slug || (recipe.category || '').toLowerCase();
+
   res.render('recipe', { recipe, formatDate, page: 'recipe', categories: db.getCategories() });
 });
 
 // ── Category Page ─────────────────────────────────────────────
 app.get('/category/:cat', (req, res) => {
-  const cat     = req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1);
-  const recipes = db.getByCategory(cat);
-  res.render('category', { recipes, category: cat, formatDate, page: 'category', categories: db.getCategories() });
+  const categories = db.getCategories();
+  const catSlug    = req.params.cat.toLowerCase();
+  const category   = categories.find(c => c.slug === catSlug)
+                  || { name: req.params.cat.charAt(0).toUpperCase() + req.params.cat.slice(1), slug: catSlug, icon: '🍽️', description: '' };
+  const recipes    = db.getByCategory(category.name);
+  res.render('category', { recipes, category, formatDate, page: 'category', categories });
 });
 
 // ── Static Pages ──────────────────────────────────────────────
