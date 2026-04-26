@@ -11,6 +11,7 @@ const PORT = process.env.PORT || 3000;
 
 // ── Middleware ───────────────────────────────────────────────
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -515,12 +516,21 @@ app.get('/admin/recipes', (req, res) => {
       <td>${r.id}</td>
       <td><a href="/recipe/${r.slug}" target="_blank">${r.title}</a></td>
       <td>${r.category || '—'}</td>
-      <td>${r.image_url ? '✓' : '✗'}</td>
+      <td>${r.image_url ? `<img src="${r.image_url}" style="height:36px;border-radius:3px;vertical-align:middle;"> ✓` : '✗'}</td>
       <td>${(r.created_at || '').slice(0, 16)}</td>
-      <td>
-        <form method="POST" action="/admin/recipes/${r.id}/delete?key=${key}" onsubmit="return confirm('Delete ${r.title.replace(/'/g, "\\'")}?')">
-          <button type="submit" style="background:#e53e3e;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">Delete</button>
-        </form>
+      <td style="vertical-align:top;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <form method="POST" action="/admin/recipes/${r.id}/delete?key=${key}" onsubmit="return confirm('Delete ${r.title.replace(/'/g, "\\'")}?')" style="display:inline">
+            <button type="submit" style="background:#e53e3e;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">Delete</button>
+          </form>
+          <button onclick="toggleImgForm(${r.id})" style="background:#2d6a4f;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">🖼 Replace Image</button>
+        </div>
+        <div id="img-form-${r.id}" style="display:none;margin-top:6px;">
+          <form method="POST" action="/admin/recipes/${r.id}/update-image?key=${key}" style="display:flex;gap:4px;">
+            <input name="image_url" type="url" placeholder="https://..." required style="flex:1;min-width:220px;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:0.85rem;">
+            <button type="submit" style="background:#2d6a4f;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">Save</button>
+          </form>
+        </div>
       </td>
     </tr>`).join('');
   res.send(`<!DOCTYPE html>
@@ -548,6 +558,12 @@ app.get('/admin/recipes', (req, res) => {
   <thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Image</th><th>Created</th><th>Action</th></tr></thead>
   <tbody>${rows}</tbody>
 </table>
+<script>
+function toggleImgForm(id) {
+  const el = document.getElementById('img-form-' + id);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
 </body></html>`);
 });
 
@@ -555,6 +571,15 @@ app.get('/admin/recipes', (req, res) => {
 app.post('/admin/recipes/:id/delete', (req, res) => {
   if (req.query.key !== ADMIN_KEY) return res.status(403).send('Forbidden');
   db.prepare('DELETE FROM recipes WHERE id = ?').run([req.params.id]);
+  res.redirect(`/admin/recipes?key=${req.query.key}`);
+});
+
+// ── POST /admin/recipes/:id/update-image ──────────────────────
+app.post('/admin/recipes/:id/update-image', (req, res) => {
+  if (req.query.key !== ADMIN_KEY) return res.status(403).send('Forbidden');
+  const { image_url } = req.body;
+  if (!image_url) return res.status(400).send('image_url is required');
+  db.prepare('UPDATE recipes SET image_url = ? WHERE id = ?').run([image_url, req.params.id]);
   res.redirect(`/admin/recipes?key=${req.query.key}`);
 });
 
