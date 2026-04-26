@@ -638,12 +638,16 @@ Respond ONLY with valid JSON in this exact format:
   const clean = raw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
   const r     = JSON.parse(clean);
 
+  // Skip if a recipe with this title already exists
+  const titleExists = db.prepare('SELECT id FROM recipes WHERE LOWER(title) = LOWER(?)').get([r.title]);
+  if (titleExists) return { ...r, skipped: true };
+
   const slug     = makeSlug(r.title) + '-' + Date.now();
   const catRow   = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
   const imageUrl = await getUnsplashImage(r.title);
 
   db.prepare(`
-    INSERT OR IGNORE INTO recipes
+    INSERT INTO recipes
       (title, slug, description, ingredients, instructions, category_id,
        prep_time, cook_time, servings, calories, protein, carbs, fat, fiber,
        tags, image_url, ai_generated)
@@ -674,14 +678,19 @@ app.get('/admin/run-seed', async (req, res) => {
   write(`Total: ${SEED_RECIPES.length} | Skipping: ${skip} | Generating: ${batch.length}`);
   write('');
 
-  let ok = 0, fail = 0;
+  let ok = 0, skipped = 0, fail = 0;
   for (let i = 0; i < batch.length; i++) {
     const { prompt, category, servings } = batch[i];
     const label = `[${skip + i + 1}/${SEED_RECIPES.length}] ${prompt} (${category})`;
     try {
       const recipe = await generateAndSaveRecipe(prompt, category, servings);
-      write(`✓ ${label} → "${recipe.title}"`);
-      ok++;
+      if (recipe.skipped) {
+        write(`⏭ ${label} → skipped (already exists: "${recipe.title}")`);
+        skipped++;
+      } else {
+        write(`✓ ${label} → "${recipe.title}"`);
+        ok++;
+      }
     } catch (err) {
       write(`✗ ${label} → ${err.message}`);
       fail++;
@@ -690,7 +699,7 @@ app.get('/admin/run-seed', async (req, res) => {
   }
 
   write('');
-  write(`=== Seeding done: ${ok} succeeded, ${fail} failed ===`);
+  write(`=== Seeding done: ${ok} added, ${skipped} skipped, ${fail} failed ===`);
 
   const missing = db.prepare("SELECT id, title FROM recipes WHERE image_url IS NULL OR image_url = '' ORDER BY id").all();
   if (missing.length > 0) {
