@@ -68,8 +68,9 @@
             <li><%= step %></li>
             <% if (i === 2 && recipe.instructions.length > 3) { %>
               </ol>
-              <!-- AdSense Mid-Recipe -->
-              <div class="ad-slot" style="margin:1.5rem 0;padding:1rem;background:#f5f5f5;text-align:center;border-radius:8px;font-size:0.75rem;color:#999;">Advertisement</div>
+              <div style="margin:1.5rem 0;padding:1rem;background:#f0f7f0;border:1px solid #c8e6c9;border-radius:8px;text-align:center;font-size:0.8rem;color:#666;">
+                📢 Advertisement
+              </div>
               <ol class="instructions-list" start="4">
             <% } %>
           <% }) %>
@@ -120,7 +121,11 @@
     <div class="grid grid-3">
       <% related.forEach(r => { %>
         <div class="card">
-          <div class="card-img-placeholder" style="height:160px; font-size:3rem;">🥗</div>
+          <% if (r.image_url) { %>
+            <img src="<%= r.image_url %>" alt="<%= r.title %>" style="width:100%;height:180px;object-fit:cover;">
+          <% } else { %>
+            <div class="card-img-placeholder">🥗</div>
+          <% } %>
           <div class="card-body">
             <h3 class="card-title"><a href="/recipe/<%= r.slug %>"><%= r.title %></a></h3>
             <p class="card-desc"><%= r.description %></p>
