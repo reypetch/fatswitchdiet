@@ -4,6 +4,7 @@ const path     = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const slugify  = require('slugify');
 const db       = require('./db/database');
+const { getUnsplashImage } = require('./utils/images');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -137,12 +138,14 @@ app.get('/recipe/:slug', (req, res) => {
         typeof s === 'string' ? s : `${s.title}: ${s.detail}`
       );
     }
-    // Pull nutrition into top-level fields
-    if (!recipe.calories && recipe.nutrition?.switched) {
-      recipe.calories = recipe.nutrition.switched.calories;
-      recipe.protein  = recipe.nutrition.switched.protein;
-      recipe.carbs    = recipe.nutrition.switched.carbs;
-      recipe.fat      = recipe.nutrition.switched.fat;
+    // Pull nutrition into top-level fields (prefer switched, fall back to original)
+    const nutSrc = recipe.nutrition?.switched || recipe.nutrition?.original;
+    if (nutSrc) {
+      if (!recipe.calories) recipe.calories = nutSrc.calories;
+      if (!recipe.protein)  recipe.protein  = nutSrc.protein;
+      if (!recipe.carbs)    recipe.carbs    = nutSrc.carbs;
+      if (!recipe.fat)      recipe.fat      = nutSrc.fat;
+      if (!recipe.fiber)    recipe.fiber    = nutSrc.fiber;
     }
   }
   // category_name / category_slug for breadcrumb
@@ -476,6 +479,282 @@ Requirements:
     }
     res.status(500).json({ error: 'Plan generation failed. Please try again in a moment.' });
   }
+});
+
+// ════════════════════════════════════════════════════════════
+//  ADMIN ROUTES
+// ════════════════════════════════════════════════════════════
+
+const ADMIN_KEY = 'fatswitchdev2026';
+const checkAdmin = (req, res) => {
+  if (req.query.key !== ADMIN_KEY) { res.status(403).json({ error: 'Forbidden' }); return false; }
+  return true;
+};
+
+// ── GET /admin/db-status ──────────────────────────────────────
+app.get('/admin/db-status', (req, res) => {
+  if (!checkAdmin(req, res)) return;
+  const total      = db.get('SELECT COUNT(*) as n FROM recipes').n;
+  const withImages = db.get("SELECT COUNT(*) as n FROM recipes WHERE image_url IS NOT NULL AND image_url != ''").n;
+  const sample     = db.prepare('SELECT title, image_url FROM recipes ORDER BY id LIMIT 3').all();
+  res.json({ total_recipes: total, with_images: withImages, without_images: total - withImages, sample });
+});
+
+// ── GET /admin/recipes ────────────────────────────────────────
+app.get('/admin/recipes', (req, res) => {
+  if (req.query.key !== ADMIN_KEY) return res.status(403).send('Forbidden');
+  const recipes = db.prepare(`
+    SELECT r.id, r.title, r.slug, r.created_at, r.image_url, c.name as category
+    FROM recipes r LEFT JOIN categories c ON r.category_id = c.id
+    ORDER BY r.id DESC
+  `).all();
+  const key  = req.query.key;
+  const rows = recipes.map((r) => `
+    <tr>
+      <td>${r.id}</td>
+      <td><a href="/recipe/${r.slug}" target="_blank">${r.title}</a></td>
+      <td>${r.category || '—'}</td>
+      <td>${r.image_url ? '✓' : '✗'}</td>
+      <td>${(r.created_at || '').slice(0, 16)}</td>
+      <td>
+        <form method="POST" action="/admin/recipes/${r.id}/delete?key=${key}" onsubmit="return confirm('Delete ${r.title.replace(/'/g, "\\'")}?')">
+          <button type="submit" style="background:#e53e3e;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;">Delete</button>
+        </form>
+      </td>
+    </tr>`).join('');
+  res.send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Admin – Recipes</title>
+<style>
+  body{font-family:sans-serif;padding:2rem;background:#f7f7f7}
+  h1{margin-bottom:1rem}
+  .actions{margin-bottom:1rem;display:flex;gap:1rem;align-items:center}
+  table{border-collapse:collapse;width:100%;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+  th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #eee;font-size:0.9rem}
+  th{background:#2d6a4f;color:#fff}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#f0fdf4}
+  a{color:#2d6a4f}
+</style></head>
+<body>
+<h1>Recipes (${recipes.length})</h1>
+<div class="actions">
+  <a href="/admin/db-status?key=${key}">DB Status</a>
+  <a href="/admin/dedupe?key=${key}" onclick="return confirm('Remove all duplicates?')">Run Dedupe</a>
+  <a href="/admin/refresh-images?key=${key}" target="_blank">Refresh Images</a>
+  <a href="/admin/run-seed?key=${key}" target="_blank">Run Seed</a>
+</div>
+<table>
+  <thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Image</th><th>Created</th><th>Action</th></tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+</body></html>`);
+});
+
+// ── POST /admin/recipes/:id/delete ────────────────────────────
+app.post('/admin/recipes/:id/delete', (req, res) => {
+  if (req.query.key !== ADMIN_KEY) return res.status(403).send('Forbidden');
+  db.prepare('DELETE FROM recipes WHERE id = ?').run([req.params.id]);
+  res.redirect(`/admin/recipes?key=${req.query.key}`);
+});
+
+// ── GET /admin/dedupe ─────────────────────────────────────────
+app.get('/admin/dedupe', (req, res) => {
+  if (!checkAdmin(req, res)) return;
+  const dupes = db.prepare(`
+    SELECT id, title FROM recipes
+    WHERE LOWER(title) IN (
+      SELECT LOWER(title) FROM recipes GROUP BY LOWER(title) HAVING COUNT(*) > 1
+    )
+    AND id NOT IN (
+      SELECT MAX(id) FROM recipes GROUP BY LOWER(title)
+    )
+  `).all();
+  if (dupes.length === 0) return res.json({ removed: 0, message: 'No duplicates found.' });
+  const ids = dupes.map((r) => r.id);
+  db.prepare(`DELETE FROM recipes WHERE id IN (${ids.map(() => '?').join(',')})`).run(ids);
+  res.json({ removed: dupes.length, titles: dupes.map((r) => r.title) });
+});
+
+// ── Admin seed helper ─────────────────────────────────────────
+const SEED_RECIPES = [
+  { prompt: 'teriyaki salmon bowl',             category: 'Dinner',    servings: 2 },
+  { prompt: 'creamy chicken alfredo',            category: 'Dinner',    servings: 4 },
+  { prompt: 'korean beef bulgogi',               category: 'Dinner',    servings: 4 },
+  { prompt: 'thai green curry chicken',          category: 'Dinner',    servings: 4 },
+  { prompt: 'garlic butter shrimp pasta',        category: 'Dinner',    servings: 2 },
+  { prompt: 'mexican chicken burrito bowl',      category: 'Dinner',    servings: 4 },
+  { prompt: 'japanese gyudon beef rice',         category: 'Dinner',    servings: 2 },
+  { prompt: 'honey garlic pork tenderloin',      category: 'Dinner',    servings: 4 },
+  { prompt: 'fluffy japanese pancakes',          category: 'Breakfast', servings: 2 },
+  { prompt: 'avocado egg toast',                 category: 'Breakfast', servings: 1 },
+  { prompt: 'greek yogurt parfait',              category: 'Breakfast', servings: 1 },
+  { prompt: 'banana oat smoothie bowl',          category: 'Breakfast', servings: 1 },
+  { prompt: 'scrambled eggs with smoked salmon', category: 'Breakfast', servings: 2 },
+  { prompt: 'overnight oats',                    category: 'Breakfast', servings: 1 },
+  { prompt: 'vietnamese chicken pho',            category: 'Lunch',     servings: 2 },
+  { prompt: 'mediterranean quinoa salad',        category: 'Lunch',     servings: 2 },
+  { prompt: 'chicken caesar wrap',               category: 'Lunch',     servings: 1 },
+  { prompt: 'tom yum soup',                      category: 'Lunch',     servings: 2 },
+  { prompt: 'spicy tuna poke bowl',              category: 'Lunch',     servings: 1 },
+  { prompt: 'chocolate lava cake',               category: 'Desserts',  servings: 2 },
+  { prompt: 'mango sticky rice',                 category: 'Desserts',  servings: 2 },
+  { prompt: 'tiramisu lightened',                category: 'Desserts',  servings: 6 },
+  { prompt: 'protein energy balls',              category: 'Snacks',    servings: 12 },
+  { prompt: 'baked sweet potato chips',          category: 'Snacks',    servings: 2 },
+  { prompt: 'almond butter apple slices',        category: 'Snacks',    servings: 1 },
+];
+
+async function generateAndSaveRecipe(prompt, category, servings = 4, dietary = []) {
+  const dietaryStr = dietary.length ? `Dietary requirements: ${dietary.join(', ')}.` : '';
+  const userPrompt = `Create a detailed ${category || 'healthy'} recipe for: "${prompt}"
+Servings: ${servings}. ${dietaryStr}
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "title": "Recipe Title",
+  "description": "2-3 sentence description",
+  "prep_time": 10,
+  "cook_time": 20,
+  "servings": ${servings},
+  "calories": 350,
+  "protein": 28,
+  "carbs": 30,
+  "fat": 12,
+  "fiber": 6,
+  "ingredients": ["ingredient 1 with amount", "ingredient 2 with amount"],
+  "instructions": ["Step 1 description", "Step 2 description"],
+  "tags": ["tag1", "tag2", "tag3"]
+}`;
+
+  const message = await claude.messages.create({
+    model:      'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    system: 'You are a professional nutritionist and chef specializing in the Fat Switch Diet. Create healthy, delicious recipes that optimize metabolism and fat-burning.',
+    messages: [{ role: 'user', content: userPrompt }],
+  });
+
+  const raw   = message.content[0].text.trim();
+  const clean = raw.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim();
+  const r     = JSON.parse(clean);
+
+  const slug     = makeSlug(r.title) + '-' + Date.now();
+  const catRow   = db.prepare('SELECT id FROM categories WHERE name LIKE ?').get([`%${category}%`]);
+  const imageUrl = await getUnsplashImage(r.title);
+
+  db.prepare(`
+    INSERT OR IGNORE INTO recipes
+      (title, slug, description, ingredients, instructions, category_id,
+       prep_time, cook_time, servings, calories, protein, carbs, fat, fiber,
+       tags, image_url, ai_generated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+  `).run([
+    r.title, slug, r.description,
+    JSON.stringify(r.ingredients), JSON.stringify(r.instructions),
+    catRow?.id || null, r.prep_time, r.cook_time, r.servings,
+    r.calories, r.protein, r.carbs, r.fat, r.fiber,
+    JSON.stringify(r.tags || []), imageUrl,
+  ]);
+
+  return { ...r, slug, image_url: imageUrl };
+}
+
+// ── GET /admin/run-seed ───────────────────────────────────────
+app.get('/admin/run-seed', async (req, res) => {
+  if (!checkAdmin(req, res)) return;
+  const skip  = Math.max(0, parseInt(req.query.skip || '0', 10));
+  const batch = SEED_RECIPES.slice(skip);
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.flushHeaders();
+
+  const write = (line) => res.write(line + '\n');
+  write(`=== FatSwitchDiet Admin Seed ===`);
+  write(`Total: ${SEED_RECIPES.length} | Skipping: ${skip} | Generating: ${batch.length}`);
+  write('');
+
+  let ok = 0, fail = 0;
+  for (let i = 0; i < batch.length; i++) {
+    const { prompt, category, servings } = batch[i];
+    const label = `[${skip + i + 1}/${SEED_RECIPES.length}] ${prompt} (${category})`;
+    try {
+      const recipe = await generateAndSaveRecipe(prompt, category, servings);
+      write(`✓ ${label} → "${recipe.title}"`);
+      ok++;
+    } catch (err) {
+      write(`✗ ${label} → ${err.message}`);
+      fail++;
+    }
+    if (i < batch.length - 1) await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  write('');
+  write(`=== Seeding done: ${ok} succeeded, ${fail} failed ===`);
+
+  const missing = db.prepare("SELECT id, title FROM recipes WHERE image_url IS NULL OR image_url = '' ORDER BY id").all();
+  if (missing.length > 0) {
+    write('');
+    write(`=== Backfilling images for ${missing.length} recipes ===`);
+    let imgOk = 0, imgFail = 0;
+    for (let i = 0; i < missing.length; i++) {
+      const { id, title } = missing[i];
+      try {
+        const url = await getUnsplashImage(title);
+        db.prepare('UPDATE recipes SET image_url = ? WHERE id = ?').run([url, id]);
+        write(`  img ✓ ${title}`);
+        imgOk++;
+      } catch (err) {
+        write(`  img ✗ ${title} → ${err.message}`);
+        imgFail++;
+      }
+      if (i < missing.length - 1) await new Promise((r) => setTimeout(r, 500));
+    }
+    write(`=== Images done: ${imgOk} updated, ${imgFail} failed ===`);
+  } else {
+    write('All recipes already have images.');
+  }
+  res.end();
+});
+
+// ── GET /admin/refresh-images ─────────────────────────────────
+app.get('/admin/refresh-images', async (req, res) => {
+  if (!checkAdmin(req, res)) return;
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.flushHeaders();
+
+  const write   = (line) => res.write(line + '\n');
+  const recipes = db.prepare('SELECT id, title FROM recipes ORDER BY id').all();
+  write(`=== Refreshing images for ALL ${recipes.length} recipes ===\n`);
+
+  let ok = 0, fail = 0;
+  for (let i = 0; i < recipes.length; i++) {
+    const { id, title } = recipes[i];
+    try {
+      const url = await getUnsplashImage(title);
+      db.prepare('UPDATE recipes SET image_url = ? WHERE id = ?').run([url, id]);
+      write(`✓ [${i + 1}/${recipes.length}] ${title}`);
+      ok++;
+    } catch (err) {
+      write(`✗ [${i + 1}/${recipes.length}] ${title} → ${err.message}`);
+      fail++;
+    }
+    if (i < recipes.length - 1) await new Promise((r) => setTimeout(r, 500));
+  }
+  write(`\n=== Done: ${ok} updated, ${fail} failed ===`);
+  res.end();
+});
+
+// ── GET /sitemap.xml ──────────────────────────────────────────
+app.get('/sitemap.xml', (req, res) => {
+  const base    = `${req.protocol}://${req.get('host')}`;
+  const recipes = db.prepare('SELECT slug, created_at FROM recipes ORDER BY created_at DESC').all();
+  const urls    = recipes.map((r) => {
+    const lastmod = (r.created_at || '').split('T')[0] || new Date().toISOString().split('T')[0];
+    return `  <url>\n    <loc>${base}/recipe/${r.slug}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <priority>0.8</priority>\n  </url>`;
+  }).join('\n');
+  res.set('Content-Type', 'application/xml');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>`);
 });
 
 // ── 404 fallback ──────────────────────────────────────────────
