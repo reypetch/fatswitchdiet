@@ -73,6 +73,7 @@ if (form) form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const formData = new FormData(form);
   const dietary = [...document.querySelectorAll('input[name="dietary"]:checked')].map(el => el.value);
+  const adminKey = new URLSearchParams(window.location.search).get('admin') || '';
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Generating...';
@@ -89,6 +90,7 @@ if (form) form.addEventListener('submit', async (e) => {
         category: formData.get('category'),
         servings: formData.get('servings'),
         dietary,
+        adminKey,
       }),
     });
     const data = await res.json();
