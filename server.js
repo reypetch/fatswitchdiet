@@ -152,6 +152,7 @@ app.get('/recipe/:slug', (req, res) => {
   recipe.category_name = recipe.category_name || recipe.category;
   recipe.category_slug = recipe.category_slug || (recipe.category || '').toLowerCase();
 
+  console.log(`[recipe] ${recipe.slug} image_url=${recipe.image_url || 'none'}`);
   const related = db.getRecentRecipes(6).filter(r => r.slug !== recipe.slug).slice(0, 3);
   res.render('recipe', { recipe, formatDate, page: 'recipe', categories: db.getCategories(), related });
 });
