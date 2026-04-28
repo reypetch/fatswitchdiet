@@ -104,13 +104,16 @@ if (form) form.addEventListener('submit', async (e) => {
     const isAdmin = !!r.slug;
     const totalTime = (r.prep_time || 0) + (r.cook_time || 0);
 
+    const adSlot = '<div class="ad-slot" style="margin:2rem 0;padding:1rem;background:#f5f5f5;text-align:center;border-radius:8px;"><span style="font-size:0.75rem;color:#999;">Advertisement</span><br><ins class="adsbygoogle" style="display:block" data-ad-format="auto" data-ad-client="ca-pub-9979915931813060"></ins></div>';
+
     const ingredientsHtml = `<ul style="list-style:none; margin-bottom:1.5rem;">
       ${r.ingredients.map(i => `<li style="padding:0.4rem 0; border-bottom:1px solid var(--gray-100);">✓ ${i}</li>`).join('')}
     </ul>`;
 
-    const instructionsHtml = `<ol style="padding-left:1.25rem; margin-bottom:1.5rem;">
-      ${r.instructions.map(s => `<li style="padding:0.4rem 0;">${s}</li>`).join('')}
-    </ol>`;
+    const instructionItems = r.instructions.map(s => `<li style="padding:0.4rem 0;">${s}</li>`);
+    const instructionsHtml = r.instructions.length > 3
+      ? `<ol style="padding-left:1.25rem; margin-bottom:1rem;">${instructionItems.slice(0, 3).join('')}</ol>${adSlot}<ol style="padding-left:1.25rem; margin-bottom:1.5rem;" start="4">${instructionItems.slice(3).join('')}</ol>`
+      : `<ol style="padding-left:1.25rem; margin-bottom:1.5rem;">${instructionItems.join('')}</ol>`;
 
     const ctaHtml = isAdmin
       ? `<div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
@@ -130,6 +133,7 @@ if (form) form.addEventListener('submit', async (e) => {
         ${r.carbs ? `<span>🌾 ${r.carbs}g carbs</span>` : ''}
         ${r.fat ? `<span>🥑 ${r.fat}g fat</span>` : ''}
       </div>
+      ${adSlot}
       <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">🛒 Ingredients</h3>
       ${ingredientsHtml}
       <h3 style="margin-bottom:0.75rem; color:var(--green-dark);">👨‍🍳 Instructions</h3>
@@ -137,6 +141,7 @@ if (form) form.addEventListener('submit', async (e) => {
       <div style="margin-top:1rem;">
         ${ctaHtml}
       </div>
+      ${adSlot}
     `;
     resultContent.style.display = 'block';
   } catch (err) {
